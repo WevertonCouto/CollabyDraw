@@ -1,4 +1,4 @@
-export const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL;
+export const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://chatwoot-excalidraw-beehive.1jqarl.easypanel.host";
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL;
 export const getDashArrayDashed = (strokeWidth: number) => [
   strokeWidth,

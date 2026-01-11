@@ -68,11 +68,20 @@ export default function CanvasBoard() {
             return window.location.hash;
         };
 
+        const getCookie = (name: string): string | null => {
+            if (typeof document === 'undefined') return null;
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+            return null;
+        };
+
         const updateRoomParams = () => {
             if (status === 'loading') return;
             const hash = getHash();
             currentHashRef.current = hash;
             const currentRoomParams = getRoomParamsFromHash(hash);
+            const userNameFromQuery = searchParams.get('name');
 
             if (status === "authenticated" && currentRoomParams) {
                 setMode("room");
@@ -80,17 +89,32 @@ export default function CanvasBoard() {
                     roomId: currentRoomParams.roomId,
                     encryptionKey: currentRoomParams.encryptionKey,
                     userId: session?.user?.id ?? null,
-                    userName: session?.user?.name ?? null,
+                    userName: userNameFromQuery || session?.user?.name || null,
                     token: session?.accessToken ?? null,
                 };
             } else if (status === "unauthenticated" && currentRoomParams) {
-                window.alert(
-                    "You need to be logged in to join this collaborative room.\n\n" +
-                    "Please sign up or log in to your account to continue. " +
-                    "Collaborative features require authentication to ensure secure access and proper identification of participants."
-                );
-                setMode("standalone");
-                router.push(`/auth/signin?callbackUrl=${hash}`);
+                // Check if there's a token in cookie (session-based access)
+                const cookieToken = getCookie('accessToken');
+                if (cookieToken) {
+                    // Session-based room access (no NextAuth session required)
+                    setMode("room");
+                    userRef.current = {
+                        roomId: currentRoomParams.roomId,
+                        encryptionKey: currentRoomParams.encryptionKey,
+                        userId: currentRoomParams.roomId, // Use roomId as userId for session-based access
+                        userName: userNameFromQuery || null,
+                        token: cookieToken,
+                    };
+                } else {
+                    // Traditional room access requires authentication
+                    window.alert(
+                        "You need to be logged in to join this collaborative room.\n\n" +
+                        "Please sign up or log in to your account to continue. " +
+                        "Collaborative features require authentication to ensure secure access and proper identification of participants."
+                    );
+                    setMode("standalone");
+                    router.push(`/auth/signin?callbackUrl=${hash}`);
+                }
             } else {
                 setMode("standalone");
             }

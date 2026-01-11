@@ -5,6 +5,7 @@ import client from "@repo/db/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/utils/auth";
 import { cookies } from "next/headers";
+import { ensureSystemUser } from "@/utils/systemUser";
 
 export async function joinRoom(data: { id: string }) {
   try {
@@ -181,5 +182,31 @@ export async function getUserRooms() {
   } catch (error) {
     console.error("Failed to fetch user rooms:", error);
     return { success: false, error: "Failed to fetch user rooms" };
+  }
+}
+
+/**
+ * Gets or creates a room by session ID.
+ * Uses the system user as adminId for session-based rooms.
+ * @param sessionId - The session ID to use as the room ID
+ * @returns The room object
+ */
+export async function getOrCreateRoomBySessionId(sessionId: string) {
+  try {
+    const systemUserId = await ensureSystemUser();
+
+    const room = await client.room.upsert({
+      where: { id: sessionId },
+      update: {},
+      create: {
+        id: sessionId,
+        adminId: systemUserId,
+      },
+    });
+
+    return { success: true, room };
+  } catch (error) {
+    console.error("Failed to get or create room by session ID:", error instanceof Error ? error.message : String(error));
+    return { success: false, error: "Failed to get or create room" };
   }
 }
