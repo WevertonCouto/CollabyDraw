@@ -8,6 +8,8 @@ WORKDIR /usr/src/app
 # Add ARG for DATABASE_URL
 ARG DATABASE_URL
 ARG JWT_SECRET
+ARG NEXT_PUBLIC_BASE_URL
+ARG NEXT_PUBLIC_WS_URL
 
 # Copy necessary files for dependency installation
 COPY ./packages ./packages
@@ -36,6 +38,8 @@ WORKDIR /usr/src/app
 # Set environment variables
 ENV DATABASE_URL=${DATABASE_URL}
 ENV JWT_SECRET=${JWT_SECRET}
+ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
+ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
 
 # Create .env.local for Next.js
 WORKDIR /usr/src/app/apps/collabydraw
@@ -55,8 +59,8 @@ WORKDIR /usr/src/app
 # Debug step: print environment variables
 # RUN echo "DATABASE_URL: ${DATABASE_URL}" && echo "JWT_SECRET set: ${JWT_SECRET:+yes}"
 
-# Build the application with database URL
-RUN DATABASE_URL=${DATABASE_URL} JWT_SECRET=${JWT_SECRET} pnpm run build
+# Build the application with environment variables
+RUN DATABASE_URL=${DATABASE_URL} JWT_SECRET=${JWT_SECRET} NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL} NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} pnpm run build
 
 # Expose the port
 EXPOSE 3000
