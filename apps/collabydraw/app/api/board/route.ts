@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     // Build redirect URL with room hash and name query param
     // Query params come before the hash in URLs
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin;
+    const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin).replace(/\/$/, '');
     const redirectUrl = `${baseUrl}/?name=${encodeURIComponent(validated.name)}#room=${validated.id},${encryptionKey}`;
 
     // Store token in cookie (non-httpOnly so it can be read on client for WebSocket)
