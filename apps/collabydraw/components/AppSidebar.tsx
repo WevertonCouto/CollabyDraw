@@ -5,35 +5,18 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import {
     Command,
-    Github,
-    Twitter,
-    UserPlus,
     Sun,
     Moon,
     Monitor,
-    Trash,
-    LogOut,
-    CopyIcon,
     TrashIcon,
     DownloadIcon,
     Upload,
-    Linkedin,
-    Share2,
-    Star,
 } from "lucide-react"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
+import { Button } from "@/components/ui/button"
 import { ColorPicker } from "@/components/color-picker"
 import { ClearCanvasDialog } from "./clear-canvas-dialog"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
-import { signOut, useSession } from "next-auth/react"
-import { redirect, usePathname } from "next/navigation"
-import Link from "next/link"
-import { CollabAuthPrompt } from "./CollabAuthPrompt"
-import { RoomSharingDialog } from "./RoomSharingDialog"
-import { BASE_URL } from "@/config/constants"
-import CreateRoomDialog from "./CreateRoomDialog"
 
 interface SidebarProps {
     isOpen: boolean
@@ -41,29 +24,20 @@ interface SidebarProps {
     canvasColor: string
     setCanvasColor: (color: string) => void
     isMobile?: boolean
-    roomName?: string
-    isStandalone?: boolean;
     onClearCanvas?: () => void;
     onExportCanvas?: () => void;
     onImportCanvas?: () => void;
 }
 
-export function AppSidebar({ isOpen, onClose, canvasColor, setCanvasColor, isMobile, roomName, isStandalone, onClearCanvas, onExportCanvas, onImportCanvas }: SidebarProps) {
-    const [stars, setStars] = useState<number | null>(null);
+export function AppSidebar({ isOpen, onClose, canvasColor, setCanvasColor, isMobile, onClearCanvas, onExportCanvas, onImportCanvas }: SidebarProps) {
     const [clearDialogOpen, setClearDialogOpen] = useState(false);
     const { theme, setTheme } = useTheme();
-    const { data: session } = useSession();
-
-    const pathname = usePathname();
-    const [isShareOpen, setIsShareOpen] = useState(false);
-    const decodedPathname = decodeURIComponent(pathname);
 
     useEffect(() => {
         const handleOutsideClick = (e: MouseEvent) => {
             const target = e.target as HTMLElement
             if (isOpen &&
                 !clearDialogOpen &&
-                !isShareOpen &&
                 !target.closest("[data-sidebar]") &&
                 !target.closest("[data-sidebar-trigger]")
             ) {
@@ -73,7 +47,7 @@ export function AppSidebar({ isOpen, onClose, canvasColor, setCanvasColor, isMob
 
         document.addEventListener("mouseup", handleOutsideClick)
         return () => document.removeEventListener("mouseup", handleOutsideClick)
-    }, [clearDialogOpen, isOpen, isShareOpen, onClose])
+    }, [clearDialogOpen, isOpen, onClose])
 
     useEffect(() => {
         if (isOpen && window.innerWidth < 768) {
@@ -84,18 +58,6 @@ export function AppSidebar({ isOpen, onClose, canvasColor, setCanvasColor, isMob
         return () => document.body.classList.remove("overflow-hidden")
     }, [isOpen])
 
-    useEffect(() => {
-        const fetchRepoMetaData = async () => {
-            try {
-                const res = await fetch('https://api.github.com/repos/coderomm/CollabyDraw');
-                const data = await res.json();
-                setStars(data.stargazers_count);
-            } catch (error) {
-                console.error('Error fetching GitHub repo data:', error);
-            }
-        }
-        fetchRepoMetaData();
-    }, [])
 
     return (
         <>
@@ -175,37 +137,5 @@ function SidebarItem({ icon: Icon, label, shortcut, className, onClick }: Sideba
                 </kbd>
             )}
         </Button>
-    )
-}
-
-interface SidebarLinkItemProps {
-    icon: React.ElementType
-    label: string
-    shortcut?: string
-    className?: string
-    url: string
-}
-
-function SidebarLinkItem({ icon: Icon, label, shortcut, className, url }: SidebarLinkItemProps) {
-    return (
-        <Link
-            className={cn(
-                buttonVariants({ variant: "ghost" }),
-                "flex h-10 w-full justify-start gap-2 rounded-md px-3 text-sm font-medium transition-colors text-color-on-surface hover:text-color-on-surface bg-transparent hover:bg-button-hover-bg focus-visible:shadow-brand-color-shadow focus-visible:outline-none focus-visible:ring-0 active:bg-button-hover-bg active:border active:border-brand-active dark:hover:bg-w-button-hover-bg",
-                className,
-            )}
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            title={label}
-        >
-            <Icon className="h-4 w-4" />
-            <span>{label}</span>
-            {shortcut && (
-                <kbd className="ml-auto inline-flex h-5 select-none items-center gap-1 rounded px-1.5 font-mono text-[10px] font-medium opacity-100 bg-muted text-muted-foreground dark:text-[var(--RadioGroup-choice-color-on)] dark:bg-[var(--RadioGroup-choice-background-on)] dark:hover:bg-[var(--RadioGroup-choice-background-on-hover)]">
-                    {shortcut}
-                </kbd>
-            )}
-        </Link>
     )
 }

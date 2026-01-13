@@ -42,8 +42,6 @@ interface MobileCommandBarProps {
     setFontSize: React.Dispatch<React.SetStateAction<FontSize>>;
     textAlign: TextAlign;
     setTextAlign: React.Dispatch<React.SetStateAction<TextAlign>>;
-    roomName?: string
-    isStandalone?: boolean;
     onClearCanvas?: () => void;
     onExportCanvas?: () => void;
     onImportCanvas?: () => void;
@@ -76,8 +74,6 @@ export function MobileCommandBar({ canvasColor,
     setFontSize,
     textAlign,
     setTextAlign,
-    roomName,
-    isStandalone,
     onClearCanvas,
     onExportCanvas,
     onImportCanvas,
@@ -114,8 +110,6 @@ export function MobileCommandBar({ canvasColor,
                             canvasColor={canvasColor}
                             setCanvasColor={setCanvasColor}
                             isMobile={true}
-                            roomName={roomName}
-                            isStandalone={isStandalone}
                             onClearCanvas={onClearCanvas}
                             onExportCanvas={onExportCanvas}
                             onImportCanvas={onImportCanvas}

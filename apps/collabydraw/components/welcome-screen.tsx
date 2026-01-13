@@ -1,6 +1,3 @@
-import { CollaborationButton } from "./CollaborationButton"
-import SignupWelcomeButton from "./SignupWelcomeButton";
-
 export function MainMenuWelcome() {
     return (
         <div className="collabyfont welcome-screen-decor welcome-screen-decor-hint welcome-screen-decor-hint--menu">

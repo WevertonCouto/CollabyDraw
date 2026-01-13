@@ -135,7 +135,7 @@ export default function CanvasBoard() {
                 window.removeEventListener('hashchange', handleHashChange);
             }
         };
-    }, [pathname, searchParams, status, session]);
+    }, [pathname, searchParams, status, session, router]);
 
     useEffect(() => {
         setCanvasEngineState(prev => ({ ...prev, canvasColor: canvasBgLight[0] }));
@@ -331,7 +331,6 @@ export default function CanvasBoard() {
                                     setCanvasColor={(newCanvasColor: SetStateAction<string>) =>
                                         setCanvasEngineState(prev => ({ ...prev, canvasColor: typeof newCanvasColor === 'function' ? newCanvasColor(prev.canvasColor) : newCanvasColor }))
                                     }
-                                    isStandalone={mode === 'room' ? false : true}
                                     onClearCanvas={clearCanvas}
                                 />
                             )}
@@ -481,7 +480,6 @@ export default function CanvasBoard() {
                     setTextAlign={(newTextAlign: SetStateAction<TextAlign>) =>
                         setCanvasEngineState(prev => ({ ...prev, textAlign: typeof newTextAlign === 'function' ? newTextAlign(prev.textAlign) : newTextAlign }))
                     }
-                    isStandalone={mode === 'room' ? false : true}
                     onClearCanvas={clearCanvas}
                 />
 
