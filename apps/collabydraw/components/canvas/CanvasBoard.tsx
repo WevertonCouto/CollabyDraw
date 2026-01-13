@@ -77,44 +77,22 @@ export default function CanvasBoard() {
         };
 
         const updateRoomParams = () => {
-            if (status === 'loading') return;
             const hash = getHash();
             currentHashRef.current = hash;
             const currentRoomParams = getRoomParamsFromHash(hash);
             const userNameFromQuery = searchParams.get('name');
 
-            if (status === "authenticated" && currentRoomParams) {
+            if (currentRoomParams) {
+                // Always enter room mode when room params are present (no auth required)
                 setMode("room");
+                const cookieToken = getCookie('accessToken');
                 userRef.current = {
                     roomId: currentRoomParams.roomId,
                     encryptionKey: currentRoomParams.encryptionKey,
-                    userId: session?.user?.id ?? null,
+                    userId: session?.user?.id ?? currentRoomParams.roomId,
                     userName: userNameFromQuery || session?.user?.name || null,
-                    token: session?.accessToken ?? null,
+                    token: session?.accessToken ?? cookieToken ?? null,
                 };
-            } else if (status === "unauthenticated" && currentRoomParams) {
-                // Check if there's a token in cookie (session-based access)
-                const cookieToken = getCookie('accessToken');
-                if (cookieToken) {
-                    // Session-based room access (no NextAuth session required)
-                    setMode("room");
-                    userRef.current = {
-                        roomId: currentRoomParams.roomId,
-                        encryptionKey: currentRoomParams.encryptionKey,
-                        userId: currentRoomParams.roomId, // Use roomId as userId for session-based access
-                        userName: userNameFromQuery || null,
-                        token: cookieToken,
-                    };
-                } else {
-                    // Traditional room access requires authentication
-                    window.alert(
-                        "You need to be logged in to join this collaborative room.\n\n" +
-                        "Please sign up or log in to your account to continue. " +
-                        "Collaborative features require authentication to ensure secure access and proper identification of participants."
-                    );
-                    setMode("standalone");
-                    router.push(`/auth/signin?callbackUrl=${hash}`);
-                }
             } else {
                 setMode("standalone");
             }
@@ -135,7 +113,7 @@ export default function CanvasBoard() {
                 window.removeEventListener('hashchange', handleHashChange);
             }
         };
-    }, [pathname, searchParams, status, session, router]);
+    }, [pathname, searchParams, session]);
 
     useEffect(() => {
         setCanvasEngineState(prev => ({ ...prev, canvasColor: canvasBgLight[0] }));
