@@ -1,43 +1,13 @@
 'use client'
 
-import { Button } from "./ui/button";
-import { useEffect, useState } from "react";
-import CreateRoomDialog from "./CreateRoomDialog";
-import { useSession } from "next-auth/react";
-import { RoomSharingDialog } from "./RoomSharingDialog";
-import { usePathname } from "next/navigation";
-import { CollabAuthPrompt } from "./CollabAuthPrompt";
-import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { RoomParticipants } from "@repo/common/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Share2 } from "lucide-react";
-import { getRoomSharingUrl, isInRoom } from "@/utils/roomParams";
-import { BASE_URL } from "@/config/constants";
 import { getClientColor } from "@/utils/getClientColor";
 
-export default function CollaborationToolbar({ participants, hash }: { participants?: RoomParticipants[], hash?: string }) {
-    const pathname = usePathname();
-    const [isOpen, setIsOpen] = useState(false);
-    const { data: session } = useSession();
-    const [inRoom, setInRoom] = useState(false);
-    const decodedPathname = decodeURIComponent(pathname);
+export default function CollaborationToolbar({ participants }: { participants?: RoomParticipants[] }) {
     const displayParticipants = participants?.slice(0, 3);
     const remainingParticipants = participants?.slice(3);
-
-    useEffect(() => {
-        if (hash) {
-            setInRoom(isInRoom(hash));
-        }
-    }, [hash]);
-
-    const getSharingUrl = () => {
-        if (!BASE_URL) {
-            throw new Error("BASE_URL not found")
-        } else {
-            return getRoomSharingUrl(BASE_URL, decodedPathname, hash ?? '');
-        }
-    };
 
     return (
         <div className="Start_Room_Session transition-transform duration-500 ease-in-out flex items-center justify-end gap-1 md:gap-2">

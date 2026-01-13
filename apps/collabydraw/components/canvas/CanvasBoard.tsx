@@ -400,7 +400,7 @@ export default function CanvasBoard() {
                 />
 
                 {matches && (
-                    <CollaborationToolbar participants={participants} hash={currentHashRef.current} />
+                    <CollaborationToolbar participants={participants} />
                 )}
             </div>
 
