@@ -3,7 +3,7 @@
 import React, { SetStateAction, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useSession } from "next-auth/react";
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useTheme } from "next-themes";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { CanvasEngine } from "@/canvas-engine/CanvasEngine";
@@ -22,10 +22,9 @@ import { HomeWelcome, MainMenuWelcome, ToolMenuWelcome } from "../welcome-screen
 import EncryptedWidget from "../EncryptedWidget";
 
 export default function CanvasBoard() {
-    const { data: session, status } = useSession();
+    const { data: session } = useSession();
     const pathname = usePathname();
     const searchParams = useSearchParams();
-    const router = useRouter();
     const { theme } = useTheme()
     const { matches, isLoading } = useMediaQuery(670);
     const [mode, setMode] = useState<Mode>("standalone");
