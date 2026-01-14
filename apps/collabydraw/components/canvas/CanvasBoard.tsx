@@ -82,7 +82,7 @@ export default function CanvasBoard() {
                 const payload = parts[1];
                 const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
                 return decoded;
-            } catch (e) {
+            } catch {
                 return null;
             }
         };
