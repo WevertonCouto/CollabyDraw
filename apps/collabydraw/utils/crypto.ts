@@ -3,6 +3,17 @@ export async function generateAESKey(): Promise<string> {
   return btoa(String.fromCharCode(...key));
 }
 
+export async function generateDeterministicAESKey(roomId: string): Promise<string> {
+  // Create a deterministic key from roomId using SHA-256 hash
+  const encoder = new TextEncoder();
+  const data = encoder.encode(roomId);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = new Uint8Array(hashBuffer);
+  // Use first 16 bytes of the hash as the AES key (AES-128)
+  const key = hashArray.slice(0, 16);
+  return btoa(String.fromCharCode(...key));
+}
+
 function base64ToUint8Array(base64: string): Uint8Array {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);

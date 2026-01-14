@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrCreateRoomBySessionId } from "@/actions/room";
-import { generateAESKey } from "@/utils/crypto";
+import { generateDeterministicAESKey } from "@/utils/crypto";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 const BoardAccessSchema = z.object({
   id: z.string().min(1, "Session ID is required"),
@@ -31,8 +32,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Generate encryption key
-    const encryptionKey = await generateAESKey();
+    // Generate deterministic encryption key based on room ID
+    // This ensures all clients in the same room use the same key
+    const encryptionKey = await generateDeterministicAESKey(validated.id);
 
     // Generate JWT token for WebSocket authentication
     if (!process.env.JWT_SECRET) {
@@ -42,8 +44,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Generate unique userId for this user session
+    // Each user gets a unique ID even if they're in the same room
+    const uniqueUserId = randomUUID();
+
     // Ensure payload is valid
-    const payload = { id: validated.id, email: "session@temp.internal" };
+    const payload = { id: uniqueUserId, email: "session@temp.internal" };
     if (!payload || !payload.id) {
       return NextResponse.json(
         { error: "Invalid session data" },

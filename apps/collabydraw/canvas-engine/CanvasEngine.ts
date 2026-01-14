@@ -258,6 +258,26 @@ export class CanvasEngine {
                 (u) => u.userId !== data.userId
               );
               this.onParticipantsUpdate?.(this.participants);
+              
+              // Remove cursors for the user who left
+              const keysToRemove: string[] = [];
+              this.remoteCursors.forEach((cursor, key) => {
+                if (cursor.userId === data.userId) {
+                  keysToRemove.push(key);
+                }
+              });
+              keysToRemove.forEach(key => this.remoteCursors.delete(key));
+              
+              // Remove click indicators for the user who left
+              const clickKeysToRemove: string[] = [];
+              this.remoteClickIndicators.forEach((_, key) => {
+                if (key.startsWith(`${data.userId}-`)) {
+                  clickKeysToRemove.push(key);
+                }
+              });
+              clickKeysToRemove.forEach(key => this.remoteClickIndicators.delete(key));
+              
+              this.clearCanvas();
             }
             break;
 
@@ -925,8 +945,8 @@ export class CanvasEngine {
 
     this.remoteCursors.forEach((cursor, userConnKey) => {
       const { x, y, userId, userName } = cursor;
-      const screenX = x * this.scale + this.panX;
-      const screenY = y * this.scale + this.panY;
+      // Note: Context already has transform applied via setTransform, so we use canvas coordinates (x, y)
+      // not screen coordinates. The transform will be applied automatically.
 
       const cursorColor: string = getClientColor({ userId, userName });
       const boxBackground = cursorColor;
@@ -942,15 +962,15 @@ export class CanvasEngine {
         this.ctx.beginPath();
         this.ctx.arc(x, y, 14, 0, Math.PI * 2, false);
         this.ctx.lineWidth = 3;
-        this.ctx.stroke();
         this.ctx.strokeStyle = "rgb(255 255 255 / 53%)";
+        this.ctx.stroke();
         this.ctx.closePath();
 
         this.ctx.beginPath();
         this.ctx.arc(x, y, 14, 0, Math.PI * 2, false);
         this.ctx.lineWidth = 1;
-        this.ctx.stroke();
         this.ctx.strokeStyle = cursorColor;
+        this.ctx.stroke();
         this.ctx.closePath();
       }
 
@@ -962,10 +982,10 @@ export class CanvasEngine {
       this.ctx.lineWidth = 6;
       this.ctx.lineJoin = "round";
       this.ctx.beginPath();
-      this.ctx.moveTo(screenX, screenY);
-      this.ctx.lineTo(screenX, screenY + 14);
-      this.ctx.lineTo(screenX + 4, screenY + 9);
-      this.ctx.lineTo(screenX + 11, screenY + 8);
+      this.ctx.moveTo(x, y);
+      this.ctx.lineTo(x, y + 14);
+      this.ctx.lineTo(x + 4, y + 9);
+      this.ctx.lineTo(x + 11, y + 8);
       this.ctx.closePath();
       this.ctx.stroke();
       this.ctx.fill();
@@ -975,16 +995,17 @@ export class CanvasEngine {
       this.ctx.strokeStyle = cursorColor;
       this.ctx.lineWidth = 2;
       this.ctx.beginPath();
-      this.ctx.moveTo(screenX, screenY);
-      this.ctx.lineTo(screenX, screenY + 14);
-      this.ctx.lineTo(screenX + 4, screenY + 9);
-      this.ctx.lineTo(screenX + 11, screenY + 8);
+      this.ctx.moveTo(x, y);
+      this.ctx.lineTo(x, y + 14);
+      this.ctx.lineTo(x + 4, y + 9);
+      this.ctx.lineTo(x + 11, y + 8);
       this.ctx.closePath();
       this.ctx.fill();
       this.ctx.stroke();
 
-      const offsetX = screenX + pointerWidth / 2;
-      const offsetY = screenY + pointerHeight + 2;
+      // Calculate label position in canvas coordinates
+      const offsetX = x + pointerWidth / 2;
+      const offsetY = y + pointerHeight + 2;
       const paddingX = 5;
       const paddingY = 3;
 
@@ -1385,7 +1406,7 @@ export class CanvasEngine {
               this.socket.send(JSON.stringify(message));
             }
           } catch (e) {
-            console.error("Error sending streaming CURSOR_MOVE: ", e);
+            console.error("[CURSOR] Error sending streaming CURSOR_MOVE: ", e);
           }
 
           this.cursorThrottleTimeout = null;

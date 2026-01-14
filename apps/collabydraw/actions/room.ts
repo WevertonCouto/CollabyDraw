@@ -5,7 +5,6 @@ import client from "@repo/db/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/utils/auth";
 import { cookies } from "next/headers";
-import { ensureSystemUser } from "@/utils/systemUser";
 
 export async function joinRoom(data: { id: string }) {
   try {
@@ -128,7 +127,6 @@ export async function deleteRoom(data: { id: string }) {
 
     const room = await client.room.findUnique({
       where: { id: data.id },
-      include: { admin: true },
     });
 
     if (!room) {
@@ -187,20 +185,18 @@ export async function getUserRooms() {
 
 /**
  * Gets or creates a room by session ID.
- * Uses the system user as adminId for session-based rooms.
+ * Creates rooms without authentication (adminId is null).
  * @param sessionId - The session ID to use as the room ID
  * @returns The room object
  */
 export async function getOrCreateRoomBySessionId(sessionId: string) {
   try {
-    const systemUserId = await ensureSystemUser();
-
     const room = await client.room.upsert({
       where: { id: sessionId },
       update: {},
       create: {
         id: sessionId,
-        adminId: systemUserId,
+        adminId: null,
       },
     });
 

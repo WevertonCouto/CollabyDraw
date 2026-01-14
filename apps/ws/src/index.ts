@@ -319,6 +319,13 @@ wss.on("connection", function connection(ws, req) {
               [parsedData.connectionId],
               false
             );
+          } else {
+            console.warn("[WS] CURSOR_MOVE missing required fields:", {
+              hasRoomId: !!parsedData.roomId,
+              hasUserId: !!parsedData.userId,
+              hasConnectionId: !!parsedData.connectionId,
+              hasMessage: !!parsedData.message
+            });
           }
           break;
 
@@ -558,6 +565,8 @@ function broadcastToRoom(
     message.participants = getCurrentParticipants(roomId);
   }
 
+  let sentCount = 0;
+  let skippedCount = 0;
   connections.forEach((conn) => {
     if (
       conn.rooms.includes(roomId) &&
@@ -566,10 +575,13 @@ function broadcastToRoom(
       try {
         if (conn.ws.readyState === WebSocket.OPEN) {
           conn.ws.send(JSON.stringify(message));
+          sentCount++;
+        } else {
+          skippedCount++;
         }
       } catch (err) {
         console.error(
-          `Error sending message to connection ${conn.connectionId}:`,
+          `[WS] Error sending message to connection ${conn.connectionId}:`,
           err
         );
       }

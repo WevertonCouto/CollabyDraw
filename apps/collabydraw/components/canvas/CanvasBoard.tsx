@@ -75,6 +75,18 @@ export default function CanvasBoard() {
             return null;
         };
 
+        const decodeJWT = (token: string): { id?: string } | null => {
+            try {
+                const parts = token.split('.');
+                if (parts.length !== 3) return null;
+                const payload = parts[1];
+                const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+                return decoded;
+            } catch (e) {
+                return null;
+            }
+        };
+
         const updateRoomParams = () => {
             const hash = getHash();
             currentHashRef.current = hash;
@@ -85,10 +97,15 @@ export default function CanvasBoard() {
                 // Always enter room mode when room params are present (no auth required)
                 setMode("room");
                 const cookieToken = getCookie('accessToken');
+                let userIdFromToken: string | null = null;
+                if (cookieToken) {
+                    const decoded = decodeJWT(cookieToken);
+                    userIdFromToken = decoded?.id ?? null;
+                }
                 userRef.current = {
                     roomId: currentRoomParams.roomId,
                     encryptionKey: currentRoomParams.encryptionKey,
-                    userId: session?.user?.id ?? currentRoomParams.roomId,
+                    userId: session?.user?.id ?? userIdFromToken ?? currentRoomParams.roomId,
                     userName: userNameFromQuery || session?.user?.name || null,
                     token: session?.accessToken ?? cookieToken ?? null,
                 };
