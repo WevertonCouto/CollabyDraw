@@ -37,7 +37,13 @@ export async function GET(request: NextRequest) {
     const encryptionKey = await generateDeterministicAESKey(validated.id);
 
     // Generate JWT token for WebSocket authentication
+    console.log("[WS-TOKEN] Checking JWT_SECRET availability", {
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      jwtSecretLength: process.env.JWT_SECRET?.length || 0
+    });
+    
     if (!process.env.JWT_SECRET) {
+      console.error("[WS-TOKEN] JWT_SECRET not found in environment");
       return NextResponse.json(
         { error: "Server configuration error" },
         { status: 500 }
@@ -47,10 +53,24 @@ export async function GET(request: NextRequest) {
     // Generate unique userId for this user session
     // Each user gets a unique ID even if they're in the same room
     const uniqueUserId = randomUUID();
+    console.log("[WS-TOKEN] Generated unique userId", {
+      userId: uniqueUserId,
+      sessionId: validated.id,
+      userName: validated.name
+    });
 
     // Ensure payload is valid
     const payload = { id: uniqueUserId, email: "session@temp.internal" };
+    console.log("[WS-TOKEN] JWT payload prepared", {
+      payload: payload,
+      hasId: !!payload.id,
+      hasEmail: !!payload.email
+    });
+    
     if (!payload || !payload.id) {
+      console.error("[WS-TOKEN] Invalid payload structure", {
+        payload: payload
+      });
       return NextResponse.json(
         { error: "Invalid session data" },
         { status: 500 }
@@ -62,6 +82,13 @@ export async function GET(request: NextRequest) {
       process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
+    
+    console.log("[WS-TOKEN] JWT token generated successfully", {
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20) + "...",
+      payload: payload,
+      expiresIn: "7d"
+    });
 
     // Build redirect URL with room hash and name query param
     // Query params come before the hash in URLs
@@ -76,6 +103,17 @@ export async function GET(request: NextRequest) {
       path: "/",
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
+    });
+
+    console.log("[WS-TOKEN] Token stored in cookie", {
+      cookieName: "accessToken",
+      tokenLength: token.length,
+      maxAge: 60 * 60 * 24 * 7,
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      redirectUrl: redirectUrl,
+      sessionId: validated.id,
+      userName: validated.name
     });
 
     return response;

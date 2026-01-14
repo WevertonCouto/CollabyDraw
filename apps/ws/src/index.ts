@@ -23,19 +23,44 @@ declare module "http" {
 const wss = new WebSocketServer({ port: Number(process.env.PORT) || 8080 });
 
 function authUser(token: string) {
+  console.log("[WS-AUTH] Starting JWT verification", {
+    tokenLength: token.length,
+    tokenPrefix: token.substring(0, 20) + "...",
+    jwtSecretSet: !!JWT_SECRET,
+    jwtSecretLength: JWT_SECRET?.length || 0
+  });
+  
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+    console.log("[WS-AUTH] JWT verification successful", {
+      decodedType: typeof decoded,
+      hasId: !!(decoded as any)?.id,
+      hasEmail: !!(decoded as any)?.email,
+      decodedKeys: decoded ? Object.keys(decoded) : []
+    });
+    
     if (typeof decoded == "string") {
-      console.error("Decoded token is a string, expected object");
+      console.error("[WS-AUTH] Decoded token is a string, expected object");
       return null;
     }
     if (!decoded.id) {
-      console.error("No valid user ID in token");
+      console.error("[WS-AUTH] No valid user ID in token", {
+        decoded: decoded
+      });
       return null;
     }
+    
+    console.log("[WS-AUTH] Authentication successful", {
+      userId: decoded.id,
+      email: (decoded as any).email || "no email"
+    });
     return decoded.id;
   } catch (err) {
-    console.error("JWT verification failed:", err);
+    console.error("[WS-AUTH] JWT verification failed", {
+      error: err instanceof Error ? err.message : String(err),
+      errorName: err instanceof Error ? err.name : "Unknown",
+      errorStack: err instanceof Error ? err.stack : undefined
+    });
     return null;
   }
 }
@@ -56,24 +81,54 @@ function generateConnectionId(): string {
 }
 
 wss.on("connection", function connection(ws, req) {
+  console.log("[WS-AUTH] New WebSocket connection attempt", {
+    url: req.url,
+    headers: {
+      origin: req.headers.origin,
+      userAgent: req.headers["user-agent"]
+    }
+  });
+  
   const url = req.url;
   if (!url) {
-    console.error("No valid URL found in request");
+    console.error("[WS-AUTH] No valid URL found in request");
+    ws.close(1008, "User not authenticated");
     return;
   }
+  
   const queryParams = new URLSearchParams(url.split("?")[1]);
   const token = queryParams.get("token");
+  console.log("[WS-AUTH] Token extraction", {
+    url: url,
+    hasToken: !!token,
+    tokenLength: token?.length || 0,
+    tokenPrefix: token ? token.substring(0, 20) + "..." : "no token",
+    queryParamsKeys: Array.from(queryParams.keys())
+  });
+  
   if (!token || token === null) {
-    console.error("No valid token found in query params");
+    console.error("[WS-AUTH] No valid token found in query params", {
+      url: url,
+      queryString: url.split("?")[1] || "no query string"
+    });
     ws.close(1008, "User not authenticated");
     return;
   }
+  
   const userId = authUser(token);
   if (!userId) {
-    console.error("Connection rejected: invalid user");
+    console.error("[WS-AUTH] Connection rejected: invalid user", {
+      tokenLength: token.length,
+      tokenPrefix: token.substring(0, 20) + "..."
+    });
     ws.close(1008, "User not authenticated");
     return;
   }
+  
+  console.log("[WS-AUTH] Connection accepted", {
+    userId: userId,
+    tokenLength: token.length
+  });
 
   const connectionId = generateConnectionId();
   const newConnection: Connection = {

@@ -196,19 +196,55 @@ export class CanvasEngine {
   }
 
   private connectWebSocket() {
+    console.log("[WS-CLIENT] Attempting WebSocket connection", {
+      hasSocket: !!this.socket,
+      socketReadyState: this.socket?.readyState,
+      hasToken: !!this.token,
+      tokenLength: this.token?.length || 0,
+      tokenPrefix: this.token ? this.token.substring(0, 20) + "..." : "no token",
+      roomId: this.roomId,
+      userId: this.userId,
+      userName: this.userName
+    });
+    
     if (
       this.socket &&
       (this.socket.readyState === WebSocket.CONNECTING ||
         this.socket.readyState === WebSocket.OPEN)
     ) {
-      // console.log("Connection already exists, not creating a new one");
+      console.log("[WS-CLIENT] Connection already exists, not creating a new one", {
+        readyState: this.socket.readyState
+      });
+      return;
+    }
+
+    if (!this.token) {
+      console.error("[WS-CLIENT] Cannot connect: no token available", {
+        roomId: this.roomId,
+        userId: this.userId
+      });
       return;
     }
 
     const url = `${WS_URL}?token=${encodeURIComponent(this.token!)}`;
+    console.log("[WS-CLIENT] WebSocket URL constructed", {
+      wsUrl: WS_URL,
+      urlLength: url.length,
+      urlPrefix: url.substring(0, 100) + "...",
+      tokenInUrl: url.includes("token="),
+      roomId: this.roomId,
+      userId: this.userId
+    });
+    
     this.socket = new WebSocket(url);
 
     this.socket.onopen = () => {
+      console.log("[WS-CLIENT] WebSocket connection opened successfully", {
+        roomId: this.roomId,
+        userId: this.userId,
+        userName: this.userName,
+        socketReadyState: this.socket?.readyState
+      });
       this.isConnected = true;
       this.onConnectionChange?.(true);
       this.socket?.send(
@@ -440,16 +476,30 @@ export class CanvasEngine {
     };
 
     this.socket.onclose = (e) => {
+      console.warn("[WS-CLIENT] WebSocket connection closed", {
+        code: e.code,
+        reason: e.reason,
+        wasClean: e.wasClean,
+        roomId: this.roomId,
+        userId: this.userId,
+        readyState: this.socket?.readyState
+      });
       this.isConnected = false;
       this.onConnectionChange?.(false);
-      console.warn("WebSocket closed:", e);
       setTimeout(() => this.connectWebSocket(), 2000);
     };
 
     this.socket.onerror = (err) => {
+      console.error("[WS-CLIENT] WebSocket connection error", {
+        error: err,
+        roomId: this.roomId,
+        userId: this.userId,
+        tokenLength: this.token?.length || 0,
+        wsUrl: WS_URL,
+        readyState: this.socket?.readyState
+      });
       this.isConnected = false;
       this.onConnectionChange?.(false);
-      console.error("WebSocket error:", err);
     };
 
     this.flushInterval = setInterval(() => {
