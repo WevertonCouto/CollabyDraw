@@ -8,9 +8,11 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "db:generate": "cd packages/db && prisma generate && cd ../..",
     "start:collabydraw": "cd apps/collabydraw && pnpm run start",
-    "start:ws": "cd apps/ws && pnpm run start"
+    "start:ws": "cd apps/ws && pnpm run start",
+    "start:all": "concurrently \"pnpm run start:collabydraw\" \"cd apps/ws && pnpm run start\" --names \"NEXT,WS\" --prefix name --prefix-colors \"blue,green\""
   },
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "prettier": "^3.5.0",
     "turbo": "^2.4.1",
     "typescript": "5.7.3"

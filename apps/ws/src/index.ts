@@ -5,8 +5,29 @@ import { WebSocketMessage, WsDataType } from "@repo/common/types";
 import { WebSocketServer, WebSocket } from "ws";
 import jwt, { JwtPayload } from "jsonwebtoken";
 
+// Force unbuffered output for Docker logs
+process.stdout.setEncoding('utf8');
+process.stderr.setEncoding('utf8');
+
+// Log server startup immediately
+console.log("=".repeat(50));
+console.log("[WS-SERVER] Starting WebSocket Server...");
+console.log("[WS-SERVER] Environment check:", {
+  PORT: process.env.PORT || "8080 (default)",
+  JWT_SECRET: process.env.JWT_SECRET ? "SET" : "NOT SET",
+  NODE_ENV: process.env.NODE_ENV || "not set",
+  DATABASE_URL: process.env.DATABASE_URL ? "SET" : "NOT SET"
+});
+console.log("[WS-SERVER] Process info:", {
+  pid: process.pid,
+  nodeVersion: process.version,
+  platform: process.platform
+});
+console.log("=".repeat(50));
+
 if (!process.env.JWT_SECRET) {
-  throw new Error("JWT_SECRET is ABSOLUTELY REQUIRED and not set");
+  console.error("[WS-SERVER] FATAL ERROR: JWT_SECRET is ABSOLUTELY REQUIRED and not set");
+  process.exit(1);
 }
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -714,5 +735,18 @@ function getCurrentParticipants(roomId: string) {
 }
 
 wss.on("listening", () => {
-  console.log(`WebSocket server started on port ${process.env.PORT || 8080}`);
+  const port = process.env.PORT || 8080;
+  console.log("=".repeat(50));
+  console.log(`[WS-SERVER] ✅ WebSocket server is LISTENING on port ${port}`);
+  console.log(`[WS-SERVER] Ready to accept connections`);
+  console.log(`[WS-SERVER] Server URL: ws://0.0.0.0:${port}`);
+  console.log("=".repeat(50));
+});
+
+// Log any server errors
+wss.on("error", (error) => {
+  console.error("[WS-SERVER] Server error:", {
+    error: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined
+  });
 });
