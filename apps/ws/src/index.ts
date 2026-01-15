@@ -13,7 +13,8 @@ process.stderr.setEncoding('utf8');
 console.log("=".repeat(50));
 console.log("[WS-SERVER] Starting WebSocket Server...");
 console.log("[WS-SERVER] Environment check:", {
-  PORT: process.env.PORT || "8080 (default)",
+  WS_PORT: process.env.WS_PORT || "8080 (default)",
+  PORT: process.env.PORT || "not set",
   JWT_SECRET: process.env.JWT_SECRET ? "SET" : "NOT SET",
   NODE_ENV: process.env.NODE_ENV || "not set",
   DATABASE_URL: process.env.DATABASE_URL ? "SET" : "NOT SET"
@@ -41,7 +42,8 @@ declare module "http" {
   }
 }
 
-const wss = new WebSocketServer({ port: Number(process.env.PORT) || 8080 });
+const WS_PORT = Number(process.env.WS_PORT) || 8080;
+const wss = new WebSocketServer({ port: WS_PORT });
 
 function authUser(token: string) {
   console.log("[WS-AUTH] Starting JWT verification", {
@@ -735,11 +737,11 @@ function getCurrentParticipants(roomId: string) {
 }
 
 wss.on("listening", () => {
-  const port = process.env.PORT || 8080;
   console.log("=".repeat(50));
-  console.log(`[WS-SERVER] ✅ WebSocket server is LISTENING on port ${port}`);
+  console.log(`[WS-SERVER] ✅ WebSocket server is LISTENING on port ${WS_PORT}`);
   console.log(`[WS-SERVER] Ready to accept connections`);
-  console.log(`[WS-SERVER] Server URL: ws://0.0.0.0:${port}`);
+  console.log(`[WS-SERVER] Server URL: ws://0.0.0.0:${WS_PORT}`);
+  console.log(`[WS-SERVER] Environment: WS_PORT=${process.env.WS_PORT || 'not set, using default 8080'}`);
   console.log("=".repeat(50));
 });
 
