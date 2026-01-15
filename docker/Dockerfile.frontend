@@ -5,7 +5,7 @@ RUN npm install -g pnpm
 
 WORKDIR /usr/src/app
 
-# Add ARG for DATABASE_URL
+# Add ARG for environment variables
 ARG DATABASE_URL
 ARG JWT_SECRET
 ARG NEXT_PUBLIC_BASE_URL
@@ -18,16 +18,12 @@ COPY ./pnpm-lock.yaml ./pnpm-lock.yaml
 COPY ./pnpm-workspace.yaml ./pnpm-workspace.yaml
 COPY ./turbo.json ./turbo.json
 COPY ./apps/collabydraw ./apps/collabydraw
-COPY ./apps/ws ./apps/ws
 
 # Install global Prisma CLI
 RUN npm install -g prisma@6.5.0
 
 # Install dependencies
 RUN pnpm install --frozen-lockfile
-
-# Generate database
-# RUN pnpm run db:generate
 
 # Change to the packages/db directory and generate Prisma client
 WORKDIR /usr/src/app/packages/db
@@ -41,7 +37,6 @@ ENV DATABASE_URL=${DATABASE_URL}
 ENV JWT_SECRET=${JWT_SECRET}
 ENV NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
 ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
-ENV WS_PORT=8080
 ENV PORT=3000
 
 # Create .env.local for Next.js
@@ -52,29 +47,12 @@ RUN echo "DATABASE_URL=$DATABASE_URL" >> .env.local
 # Change back to the root directory
 WORKDIR /usr/src/app
 
-# Debugging step
-# RUN echo "DATABASE_URL length: ${#DATABASE_URL}"
-# RUN echo "JWT_SECRET length: ${#JWT_SECRET}"
-
-# Fail if secrets are not set
-# RUN test -n "$DATABASE_URL" && test -n "$JWT_SECRET"
-
-# Debug step: print environment variables
-# RUN echo "DATABASE_URL: ${DATABASE_URL}" && echo "JWT_SECRET set: ${JWT_SECRET:+yes}"
-
-# Build the application with environment variables
+# Build only the Next.js application
 RUN DATABASE_URL=${DATABASE_URL} JWT_SECRET=${JWT_SECRET} NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL} NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} pnpm run build
 
-# Build the WebSocket server
-WORKDIR /usr/src/app/apps/ws
-RUN pnpm run build
-
-# Change back to the root directory
-WORKDIR /usr/src/app
-
-# Expose the ports
+# Expose only port 3000
 EXPOSE 3000
-EXPOSE 8080
 
-# Start both services using concurrently
-CMD ["pnpm", "run", "start:all"]
+# Start only Next.js
+WORKDIR /usr/src/app/apps/collabydraw
+CMD ["pnpm", "run", "start"]
