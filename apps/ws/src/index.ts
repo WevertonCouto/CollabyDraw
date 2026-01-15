@@ -148,20 +148,35 @@ wss.on("connection", function connection(ws, req) {
   );
   console.log("✅ Sent CONNECTION_READY to:", connectionId);
 
-  ws.on("error", (err) =>
-    console.error(`WebSocket error for user ${userId}:`, err)
-  );
+  ws.on("error", (err) => {
+    console.error(`[WS-AUTH] WebSocket error for user ${userId}:`, {
+      connectionId,
+      userId,
+      error: err instanceof Error ? err.message : String(err),
+      errorStack: err instanceof Error ? err.stack : undefined
+    });
+  });
 
   ws.on("message", async function message(data) {
     try {
       const parsedData: WebSocketMessage = JSON.parse(data.toString());
+      console.log("[WS-AUTH] Received message", {
+        connectionId,
+        userId,
+        messageType: parsedData.type,
+        hasRoomId: !!parsedData.roomId,
+        hasUserId: !!parsedData.userId
+      });
+      
       if (!parsedData) {
-        console.error("Error in parsing ws data");
+        console.error("[WS-AUTH] Error in parsing ws data");
         return;
       }
 
       if (!parsedData.roomId || !parsedData.userId) {
-        console.error("No userId or roomId provided for WS message");
+        console.error("[WS-AUTH] No userId or roomId provided for WS message", {
+          parsedData
+        });
         return;
       }
 
@@ -169,8 +184,11 @@ wss.on("connection", function connection(ws, req) {
         (x) => x.connectionId === connectionId
       );
       if (!connection) {
-        console.error("No connection found");
-        ws.close();
+        console.error("[WS-AUTH] No connection found, closing", {
+          connectionId,
+          totalConnections: connections.length
+        });
+        ws.close(1008, "Connection not found");
         return;
       }
 
@@ -189,12 +207,28 @@ wss.on("connection", function connection(ws, req) {
       switch (parsedData.type) {
         case WsDataType.JOIN:
           {
+            console.log("[WS-AUTH] Processing JOIN request", {
+              connectionId,
+              userId,
+              roomId: parsedData.roomId
+            });
+            
             const roomCheckResponse = await client.room.findUnique({
               where: { id: parsedData.roomId },
             });
 
+            console.log("[WS-AUTH] Room check result", {
+              connectionId,
+              roomId: parsedData.roomId,
+              roomExists: !!roomCheckResponse
+            });
+
             if (!roomCheckResponse) {
-              ws.close();
+              console.error("[WS-AUTH] Room not found, closing connection", {
+                connectionId,
+                roomId: parsedData.roomId
+              });
+              ws.close(1008, "Room not found");
               return;
             }
 
@@ -537,10 +571,25 @@ wss.on("connection", function connection(ws, req) {
   });
 
   ws.on("close", (code, reason) => {
+    console.log("[WS-AUTH] Connection closed by server/client", {
+      connectionId,
+      userId,
+      code,
+      reason: reason.toString(),
+      wasClean: code === 1000 || code === 1001
+    });
+    
     const connection = connections.find(
       (conn) => conn.connectionId === connectionId
     );
     if (connection) {
+      console.log("[WS-AUTH] Cleaning up connection", {
+        connectionId,
+        userId,
+        rooms: connection.rooms,
+        totalRooms: connection.rooms.length
+      });
+      
       // For each room this connection was in
       connection.rooms.forEach((roomId) => {
         // Check if this was the last connection from this user in the room
@@ -602,7 +651,17 @@ wss.on("connection", function connection(ws, req) {
     );
     if (index !== -1) {
       connections.splice(index, 1);
-      console.log(`Connection ${connectionId} closed and removed`);
+      console.log("[WS-AUTH] Connection removed from connections array", {
+        connectionId,
+        userId,
+        remainingConnections: connections.length
+      });
+    } else {
+      console.warn("[WS-AUTH] Connection not found in array when closing", {
+        connectionId,
+        userId,
+        totalConnections: connections.length
+      });
     }
   });
 });
