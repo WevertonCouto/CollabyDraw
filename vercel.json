@@ -5,15 +5,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://soubeehive.lovable.app https://*.lovable.app https://collaby-draw-collabydraw.vercel.app https://localhost:*;"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": ""
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "clipboard-read=*, clipboard-write=*"
+          "value": "frame-ancestors https://soubeehive.lovable.app https://*.lovable.app https://localhost:*;"
         }
       ]
     }
