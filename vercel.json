@@ -1,0 +1,22 @@
+{
+    "headers": [
+      {
+        "source": "/(.*)",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "frame-ancestors 'self' https://soubeehive.lovable.app https://*.lovable.app https://localhost:*"
+          },
+          {
+            "key": "X-Frame-Options",
+            "value": "ALLOWALL"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "clipboard-read=*, clipboard-write=*"
+          }
+        ]
+      }
+    ]
+  }
+  
