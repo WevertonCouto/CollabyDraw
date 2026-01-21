@@ -369,103 +369,105 @@ export default function CanvasBoard() {
                     : canvasEngineState.activeTool === "laser"
                         ? "cursor-crosshair"
                         : "cursor-crosshair")}>
-            <div className="App_Menu App_Menu_Top fixed z-[4] top-4 right-4 left-4 flex justify-center items-center xs670:grid xs670:grid-cols-[1fr_auto_1fr] xs670:gap-4 md:gap-8 xs670:items-start">
-                {matches && (
-                    <div className="Main_Menu_Stack Sidebar_Trigger_Button xs670:grid xs670:gap-[calc(.25rem*6)] grid-cols-[auto] grid-flow-row grid-rows auto-rows-min justify-self-start">
-                        <div className="relative">
-                            <AppMenuButton onClick={toggleSidebar} />
+            {!isReadOnly && !isSessionExpired && (
+                <div className="App_Menu App_Menu_Top fixed z-[4] top-4 right-4 left-4 flex justify-center items-center xs670:grid xs670:grid-cols-[1fr_auto_1fr] xs670:gap-4 md:gap-8 xs670:items-start">
+                    {matches && (
+                        <div className="Main_Menu_Stack Sidebar_Trigger_Button xs670:grid xs670:gap-[calc(.25rem*6)] grid-cols-[auto] grid-flow-row grid-rows auto-rows-min justify-self-start">
+                            <div className="relative">
+                                <AppMenuButton onClick={toggleSidebar} />
 
-                            {canvasEngineState.sidebarOpen && (
-                                <AppSidebar
-                                    isOpen={canvasEngineState.sidebarOpen}
-                                    onClose={() => setCanvasEngineState(prev => ({ ...prev, sidebarOpen: false }))}
-                                    canvasColor={canvasEngineState.canvasColor}
-                                    setCanvasColor={(newCanvasColor: SetStateAction<string>) =>
-                                        setCanvasEngineState(prev => ({ ...prev, canvasColor: typeof newCanvasColor === 'function' ? newCanvasColor(prev.canvasColor) : newCanvasColor }))
-                                    }
-                                    onClearCanvas={clearCanvas}
-                                />
-                            )}
+                                {canvasEngineState.sidebarOpen && (
+                                    <AppSidebar
+                                        isOpen={canvasEngineState.sidebarOpen}
+                                        onClose={() => setCanvasEngineState(prev => ({ ...prev, sidebarOpen: false }))}
+                                        canvasColor={canvasEngineState.canvasColor}
+                                        setCanvasColor={(newCanvasColor: SetStateAction<string>) =>
+                                            setCanvasEngineState(prev => ({ ...prev, canvasColor: typeof newCanvasColor === 'function' ? newCanvasColor(prev.canvasColor) : newCanvasColor }))
+                                        }
+                                        onClearCanvas={clearCanvas}
+                                    />
+                                )}
 
-                            {canvasEngineState.activeTool === "grab" && canvasEngineState.isCanvasEmpty && (
-                                <MainMenuWelcome />
-                            )}
+                                {canvasEngineState.activeTool === "grab" && canvasEngineState.isCanvasEmpty && (
+                                    <MainMenuWelcome />
+                                )}
+
+                            </div>
+
+                            <StyleConfigurator
+                                activeTool={canvasEngineState.activeTool}
+                                strokeFill={canvasEngineState.strokeFill}
+                                setStrokeFill={(newStrokeFill: SetStateAction<StrokeFill>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, strokeFill: typeof newStrokeFill === 'function' ? newStrokeFill(prev.strokeFill) : newStrokeFill }))
+                                }
+                                strokeWidth={canvasEngineState.strokeWidth}
+                                setStrokeWidth={(newStrokeWidth: SetStateAction<StrokeWidth>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, strokeWidth: typeof newStrokeWidth === 'function' ? newStrokeWidth(prev.strokeWidth) : newStrokeWidth }))
+                                }
+                                bgFill={canvasEngineState.bgFill}
+                                setBgFill={(newBgFill: SetStateAction<BgFill>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, bgFill: typeof newBgFill === 'function' ? newBgFill(prev.bgFill) : newBgFill }))
+                                }
+                                strokeEdge={canvasEngineState.strokeEdge}
+                                setStrokeEdge={(newStrokeEdge: SetStateAction<StrokeEdge>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, strokeEdge: typeof newStrokeEdge === 'function' ? newStrokeEdge(prev.strokeEdge) : newStrokeEdge }))
+                                }
+                                strokeStyle={canvasEngineState.strokeStyle}
+                                setStrokeStyle={(newStrokeStyle: SetStateAction<StrokeStyle>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, strokeStyle: typeof newStrokeStyle === 'function' ? newStrokeStyle(prev.strokeStyle) : newStrokeStyle }))
+                                }
+
+                                roughStyle={canvasEngineState.roughStyle}
+                                setRoughStyle={(newRoughStyle: SetStateAction<RoughStyle>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, roughStyle: typeof newRoughStyle === 'function' ? newRoughStyle(prev.roughStyle) : newRoughStyle }))
+                                }
+
+                                fillStyle={canvasEngineState.fillStyle}
+                                setFillStyle={(newFillStyle: SetStateAction<FillStyle>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, fillStyle: typeof newFillStyle === 'function' ? newFillStyle(prev.fillStyle) : newFillStyle }))
+                                }
+
+                                fontFamily={canvasEngineState.fontFamily}
+                                setFontFamily={(newFontFamily: SetStateAction<FontFamily>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, fontFamily: typeof newFontFamily === 'function' ? newFontFamily(prev.fontFamily) : newFontFamily }))
+                                }
+
+                                fontSize={canvasEngineState.fontSize}
+                                setFontSize={(newFontSize: SetStateAction<FontSize>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, fontSize: typeof newFontSize === 'function' ? newFontSize(prev.fontSize) : newFontSize }))
+                                }
+
+                                textAlign={canvasEngineState.textAlign}
+                                setTextAlign={(newTextAlign: SetStateAction<TextAlign>) =>
+                                    setCanvasEngineState(prev => ({ ...prev, textAlign: typeof newTextAlign === 'function' ? newTextAlign(prev.textAlign) : newTextAlign }))
+                                }
+                            />
 
                         </div>
+                    )}
+                    <ToolSelector
+                        selectedTool={canvasEngineState.activeTool}
+                        onToolSelect={(newTool: SetStateAction<ToolType>) =>
+                            setCanvasEngineState(prev => ({ ...prev, activeTool: typeof newTool === 'function' ? newTool(prev.activeTool) : newTool }))
+                        }
+                        isReadOnly={false}
+                    />
 
-                        <StyleConfigurator
-                            activeTool={canvasEngineState.activeTool}
-                            strokeFill={canvasEngineState.strokeFill}
-                            setStrokeFill={(newStrokeFill: SetStateAction<StrokeFill>) =>
-                                setCanvasEngineState(prev => ({ ...prev, strokeFill: typeof newStrokeFill === 'function' ? newStrokeFill(prev.strokeFill) : newStrokeFill }))
-                            }
-                            strokeWidth={canvasEngineState.strokeWidth}
-                            setStrokeWidth={(newStrokeWidth: SetStateAction<StrokeWidth>) =>
-                                setCanvasEngineState(prev => ({ ...prev, strokeWidth: typeof newStrokeWidth === 'function' ? newStrokeWidth(prev.strokeWidth) : newStrokeWidth }))
-                            }
-                            bgFill={canvasEngineState.bgFill}
-                            setBgFill={(newBgFill: SetStateAction<BgFill>) =>
-                                setCanvasEngineState(prev => ({ ...prev, bgFill: typeof newBgFill === 'function' ? newBgFill(prev.bgFill) : newBgFill }))
-                            }
-                            strokeEdge={canvasEngineState.strokeEdge}
-                            setStrokeEdge={(newStrokeEdge: SetStateAction<StrokeEdge>) =>
-                                setCanvasEngineState(prev => ({ ...prev, strokeEdge: typeof newStrokeEdge === 'function' ? newStrokeEdge(prev.strokeEdge) : newStrokeEdge }))
-                            }
-                            strokeStyle={canvasEngineState.strokeStyle}
-                            setStrokeStyle={(newStrokeStyle: SetStateAction<StrokeStyle>) =>
-                                setCanvasEngineState(prev => ({ ...prev, strokeStyle: typeof newStrokeStyle === 'function' ? newStrokeStyle(prev.strokeStyle) : newStrokeStyle }))
-                            }
+                    {matches && (
+                        <div className="flex items-center gap-4">
+                            {sessionInfo && mode === 'room' && (
+                                <SessionTimer 
+                                    sessionInfo={sessionInfo}
+                                    onExpiredChange={setIsSessionExpired}
+                                />
+                            )}
+                            <CollaborationToolbar participants={participants} />
+                        </div>
+                    )}
+                </div>
+            )}
 
-                            roughStyle={canvasEngineState.roughStyle}
-                            setRoughStyle={(newRoughStyle: SetStateAction<RoughStyle>) =>
-                                setCanvasEngineState(prev => ({ ...prev, roughStyle: typeof newRoughStyle === 'function' ? newRoughStyle(prev.roughStyle) : newRoughStyle }))
-                            }
-
-                            fillStyle={canvasEngineState.fillStyle}
-                            setFillStyle={(newFillStyle: SetStateAction<FillStyle>) =>
-                                setCanvasEngineState(prev => ({ ...prev, fillStyle: typeof newFillStyle === 'function' ? newFillStyle(prev.fillStyle) : newFillStyle }))
-                            }
-
-                            fontFamily={canvasEngineState.fontFamily}
-                            setFontFamily={(newFontFamily: SetStateAction<FontFamily>) =>
-                                setCanvasEngineState(prev => ({ ...prev, fontFamily: typeof newFontFamily === 'function' ? newFontFamily(prev.fontFamily) : newFontFamily }))
-                            }
-
-                            fontSize={canvasEngineState.fontSize}
-                            setFontSize={(newFontSize: SetStateAction<FontSize>) =>
-                                setCanvasEngineState(prev => ({ ...prev, fontSize: typeof newFontSize === 'function' ? newFontSize(prev.fontSize) : newFontSize }))
-                            }
-
-                            textAlign={canvasEngineState.textAlign}
-                            setTextAlign={(newTextAlign: SetStateAction<TextAlign>) =>
-                                setCanvasEngineState(prev => ({ ...prev, textAlign: typeof newTextAlign === 'function' ? newTextAlign(prev.textAlign) : newTextAlign }))
-                            }
-                        />
-
-                    </div>
-                )}
-                <ToolSelector
-                    selectedTool={canvasEngineState.activeTool}
-                    onToolSelect={(newTool: SetStateAction<ToolType>) =>
-                        setCanvasEngineState(prev => ({ ...prev, activeTool: typeof newTool === 'function' ? newTool(prev.activeTool) : newTool }))
-                    }
-                    isReadOnly={isReadOnly || isSessionExpired}
-                />
-
-                {matches && (
-                    <div className="flex items-center gap-4">
-                        {sessionInfo && mode === 'room' && (
-                            <SessionTimer 
-                                sessionInfo={sessionInfo}
-                                onExpiredChange={setIsSessionExpired}
-                            />
-                        )}
-                        <CollaborationToolbar participants={participants} />
-                    </div>
-                )}
-            </div>
-
-            {canvasEngineState.activeTool === "grab" && canvasEngineState.isCanvasEmpty && !isLoading && (
+            {!isReadOnly && !isSessionExpired && canvasEngineState.activeTool === "grab" && canvasEngineState.isCanvasEmpty && !isLoading && (
                 <div className="relative">
                     <ToolMenuWelcome />
                 </div>
@@ -478,19 +480,13 @@ export default function CanvasBoard() {
                 />
             )}
 
-            {!isLoading && matches && (
+            {!isReadOnly && !isSessionExpired && !isLoading && matches && (
                 <EncryptedWidget />
-            )}
-
-            {isReadOnly && mode === 'room' && (
-                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-yellow-500/90 dark:bg-yellow-600/90 text-black dark:text-white px-4 py-2 rounded-md shadow-lg backdrop-blur-sm">
-                    <span className="text-sm font-medium">Read-Only Mode: You can view but not edit</span>
-                </div>
             )}
 
             <div className="collabydraw-textEditorContainer"></div>
 
-            {!matches && (
+            {!isReadOnly && !isSessionExpired && !matches && (
                 <MobileCommandBar
                     sidebarOpen={canvasEngineState.sidebarOpen}
                     setSidebarOpen={() => setCanvasEngineState(prev => ({ ...prev, sidebarOpen: !prev.sidebarOpen }))}
@@ -552,8 +548,14 @@ export default function CanvasBoard() {
 
             )}
 
-            {!isLoading && canvasEngineState.activeTool === "grab" && canvasEngineState.isCanvasEmpty && (
+            {!isReadOnly && !isSessionExpired && !isLoading && canvasEngineState.activeTool === "grab" && canvasEngineState.isCanvasEmpty && (
                 <HomeWelcome />
+            )}
+
+            {(isReadOnly || isSessionExpired) && (
+                <div className="fixed bottom-4 right-4 z-50 px-3 py-2 rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-700 shadow-lg backdrop-blur-sm">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Modo apenas leitura</span>
+                </div>
             )}
 
             {isLoading && (
