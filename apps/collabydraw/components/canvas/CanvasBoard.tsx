@@ -20,6 +20,15 @@ import CollaborationToolbar from "../CollaborationToolbar";
 import ZoomControl from "../ZoomControl";
 import { HomeWelcome, MainMenuWelcome, ToolMenuWelcome } from "../welcome-screen";
 import EncryptedWidget from "../EncryptedWidget";
+import { SessionTimer } from "../SessionTimer";
+
+interface SessionInfo {
+  id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+}
 
 export default function CanvasBoard() {
     const { data: session } = useSession();
@@ -32,6 +41,8 @@ export default function CanvasBoard() {
     const [isConnected, setIsConnected] = useState(false);
     const [isCanvasReady, setIsCanvasReady] = useState(false);
     const [isReadOnly, setIsReadOnly] = useState(false);
+    const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
+    const [isSessionExpired, setIsSessionExpired] = useState(false);
     const initializedWithMode = useRef<Mode | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const currentHashRef = useRef<string>('');
@@ -99,6 +110,20 @@ export default function CanvasBoard() {
             const readOnlyFromCookie = getCookie('isReadOnly') === 'true';
             const shouldBeReadOnly = readOnlyFromQuery || readOnlyFromCookie;
             setIsReadOnly(shouldBeReadOnly);
+
+            // Get session info from cookie
+            const sessionInfoCookie = getCookie('sessionInfo');
+            if (sessionInfoCookie) {
+                try {
+                    // Decode URL-encoded cookie value
+                    const decodedCookie = decodeURIComponent(sessionInfoCookie);
+                    const parsedSessionInfo = JSON.parse(decodedCookie) as SessionInfo;
+                    setSessionInfo(parsedSessionInfo);
+                } catch (error) {
+                    console.error("[SESSION-TIMER] Error parsing session info:", error);
+                    setSessionInfo(null);
+                }
+            }
 
             if (currentRoomParams) {
                 // Always enter room mode when room params are present (no auth required)
@@ -242,8 +267,13 @@ export default function CanvasBoard() {
             mode === 'room' ? (connectionStatus) => setIsConnected(connectionStatus) : null,
             userRef.current.encryptionKey,
             theme === 'light' ? "light" : "dark",
-            isReadOnly
+            isReadOnly,
+            isSessionExpired
         );
+        
+        // Update session expired state when it changes
+        engine.setSessionExpired(isSessionExpired);
+        
         engine.setOnShapeCountChange((count: number) => {
             setCanvasEngineState(prev => ({
                 ...prev,
@@ -251,7 +281,18 @@ export default function CanvasBoard() {
             }));
         });
         return engine;
-    }, [canvasEngineState.canvasColor, mode, theme, isReadOnly]);
+    }, [canvasEngineState.canvasColor, mode, theme, isReadOnly, isSessionExpired]);
+
+    // Update session expired state when it changes
+    useEffect(() => {
+        if (canvasEngineState.engine && canvasEngineState.engine.setSessionExpired) {
+            canvasEngineState.engine.setSessionExpired(isSessionExpired);
+            // Force grab tool if session expired
+            if (isSessionExpired && canvasEngineState.activeTool !== "grab") {
+                setCanvasEngineState(prev => ({ ...prev, activeTool: "grab" }));
+            }
+        }
+    }, [isSessionExpired, canvasEngineState.engine, canvasEngineState.activeTool]);
 
     useEffect(() => {
         if (!isCanvasReady) return;
@@ -408,11 +449,16 @@ export default function CanvasBoard() {
                     onToolSelect={(newTool: SetStateAction<ToolType>) =>
                         setCanvasEngineState(prev => ({ ...prev, activeTool: typeof newTool === 'function' ? newTool(prev.activeTool) : newTool }))
                     }
-                    isReadOnly={isReadOnly}
+                    isReadOnly={isReadOnly || isSessionExpired}
                 />
 
                 {matches && (
-                    <CollaborationToolbar participants={participants} />
+                    <div className="flex items-center gap-4">
+                        {sessionInfo && mode === 'room' && (
+                            <SessionTimer sessionInfo={sessionInfo} />
+                        )}
+                        <CollaborationToolbar participants={participants} />
+                    </div>
                 )}
             </div>
 

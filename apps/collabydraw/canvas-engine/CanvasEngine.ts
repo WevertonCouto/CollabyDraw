@@ -67,6 +67,7 @@ export class CanvasEngine {
   private canvasBgColor: string;
   private isStandalone: boolean = false;
   private isReadOnly: boolean = false;
+  private isSessionExpired: boolean = false;
   private onScaleChangeCallback: (scale: number) => void;
   private onParticipantsUpdate:
     | ((participants: RoomParticipants[]) => void)
@@ -156,7 +157,8 @@ export class CanvasEngine {
     onConnectionChange: ((isConnected: boolean) => void) | null,
     encryptionKey: string | null,
     appTheme: "light" | "dark" | null,
-    isReadOnly: boolean = false
+    isReadOnly: boolean = false,
+    isSessionExpired: boolean = false
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -168,6 +170,7 @@ export class CanvasEngine {
     this.token = token;
     this.isStandalone = isStandalone;
     this.isReadOnly = isReadOnly;
+    this.isSessionExpired = isSessionExpired;
     this.onScaleChangeCallback = onScaleChangeCallback;
     this.onParticipantsUpdate = onParticipantsUpdate;
     this.onConnectionChange = onConnectionChange;
@@ -255,18 +258,28 @@ export class CanvasEngine {
         roomId: this.roomId,
         userId: this.userId,
         userName: this.userName,
-        socketReadyState: this.socket?.readyState
+        socketReadyState: this.socket?.readyState,
+        isReadOnly: this.isReadOnly,
+        isSessionExpired: this.isSessionExpired
       });
       this.isConnected = true;
       this.onConnectionChange?.(true);
-      this.socket?.send(
-        JSON.stringify({
-          type: WsDataType.JOIN,
-          roomId: this.roomId,
-          userId: this.userId,
-          userName: this.userName,
-        })
-      );
+      
+      // Send JOIN message to get existing shapes and participants
+      // This should work even in read-only mode
+      const joinMessage = {
+        type: WsDataType.JOIN,
+        roomId: this.roomId,
+        userId: this.userId,
+        userName: this.userName,
+      };
+      
+      console.log("[WS-CLIENT] Sending JOIN message", {
+        ...joinMessage,
+        isReadOnly: this.isReadOnly
+      });
+      
+      this.socket?.send(JSON.stringify(joinMessage));
     };
 
     this.socket.onmessage = async (event) => {
@@ -367,33 +380,65 @@ export class CanvasEngine {
             break;
 
           case WsDataType.LASER_OFF:
-            if (data.userId !== this.userId) {
-              const key = `${data.userId}-${data.connectionId}`;
+            const key = `${data.userId}-${data.connectionId}`;
+            if (data.userId === this.userId) {
+              // Clear local laser if it's our own message (from another tab/connection)
+              if (this.laserActive) {
+                this.laserActive = false;
+                this.laserPosition = null;
+              }
+            } else {
+              // Remove remote laser pointer
               this.remoteLaserPointers.delete(key);
-              this.clearCanvas();
             }
+            this.clearCanvas();
             break;
 
           case WsDataType.EXISTING_SHAPES:
+            console.log("[WS-CLIENT] Received EXISTING_SHAPES", {
+              hasMessage: !!data.message,
+              isArray: Array.isArray(data.message),
+              messageLength: Array.isArray(data.message) ? data.message.length : 0,
+              isReadOnly: this.isReadOnly,
+              roomId: this.roomId
+            });
+            
             if (Array.isArray(data.message) && data.message.length > 0) {
               const decryptedShapes = await Promise.all(
                 data.message.map(async (shape) => {
                   if (shape.message) {
-                    const decrypted = await decryptData(
-                      shape.message,
-                      this.encryptionKey!
-                    );
-                    return JSON.parse(decrypted);
+                    try {
+                      const decrypted = await decryptData(
+                        shape.message,
+                        this.encryptionKey!
+                      );
+                      return JSON.parse(decrypted);
+                    } catch (error) {
+                      console.error("[WS-CLIENT] Error decrypting shape", error);
+                      return null;
+                    }
                   }
                   return null;
                 })
               );
 
               const validShapes = decryptedShapes.filter((s) => s !== null);
+              console.log("[WS-CLIENT] Processed EXISTING_SHAPES", {
+                totalShapes: data.message.length,
+                validShapes: validShapes.length,
+                isReadOnly: this.isReadOnly
+              });
+              
               if (validShapes.length > 0) {
                 this.updateShapes(validShapes);
                 this.notifyShapeCountChange();
+                this.clearCanvas(); // Force re-render after loading shapes
               }
+            } else {
+              console.log("[WS-CLIENT] No shapes to load", {
+                hasMessage: !!data.message,
+                isReadOnly: this.isReadOnly
+              });
             }
             break;
 
@@ -702,6 +747,12 @@ export class CanvasEngine {
   private sendLaserOff() {
     if (this.isReadOnly || this.isStandalone || !this.isConnected) return;
 
+    // Clear any pending throttle
+    if (this.laserThrottleTimeout !== null) {
+      window.clearTimeout(this.laserThrottleTimeout);
+      this.laserThrottleTimeout = null;
+    }
+
     const message = {
       type: WsDataType.LASER_OFF,
       roomId: this.roomId!,
@@ -714,6 +765,12 @@ export class CanvasEngine {
 
     if (this.socket?.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(message));
+      console.log("[LASER] Sent LASER_OFF", { userId: this.userId, connectionId: this.connectionId });
+    } else {
+      console.warn("[LASER] Could not send LASER_OFF - socket not open", {
+        readyState: this.socket?.readyState,
+        isConnected: this.isConnected
+      });
     }
   }
 
@@ -737,6 +794,7 @@ export class CanvasEngine {
     this.canvas.addEventListener("mousedown", this.mouseDownHandler);
     this.canvas.addEventListener("mousemove", this.mouseMoveHandler);
     this.canvas.addEventListener("mouseup", this.mouseUpHandler);
+    this.canvas.addEventListener("mouseleave", this.mouseUpHandler);
     this.canvas.addEventListener("wheel", this.mouseWheelHandler, {
       passive: false,
     });
@@ -749,14 +807,43 @@ export class CanvasEngine {
     this.canvas.addEventListener("touchend", this.touchEndHandler, {
       passive: false,
     });
+    
+    // Add global mouseup listener to catch mouse releases outside canvas
+    document.addEventListener("mouseup", this.mouseUpHandler);
   }
 
   setTool(tool: ToolType) {
+    // If session expired, only allow grab tool
+    if (this.isSessionExpired && tool !== "grab") {
+      this.activeTool = "grab";
+      if (tool !== "selection") {
+        this.selectedShape = null;
+        this.SelectionController.setSelectedShape(null);
+        this.clearCanvas();
+      }
+      return;
+    }
+    
+    // If switching away from laser tool, deactivate laser and send OFF message
+    if (this.activeTool === "laser" && tool !== "laser" && this.laserActive) {
+      this.laserActive = false;
+      this.laserPosition = null;
+      this.sendLaserOff();
+    }
+    
     this.activeTool = tool;
     if (tool !== "selection") {
       this.selectedShape = null;
       this.SelectionController.setSelectedShape(null);
       this.clearCanvas();
+    }
+  }
+
+  setSessionExpired(expired: boolean) {
+    this.isSessionExpired = expired;
+    // Force grab tool if session expired
+    if (expired && this.activeTool !== "grab") {
+      this.setTool("grab");
     }
   }
 
@@ -1258,14 +1345,15 @@ export class CanvasEngine {
   mouseDownHandler = (e: MouseEvent) => {
     const { x, y } = this.transformPanScale(e.clientX, e.clientY);
     
-    // If read-only mode, only allow grab tool for panning
-    if (this.isReadOnly) {
+    // If read-only mode or session expired, only allow grab tool for panning
+    if (this.isReadOnly || this.isSessionExpired) {
       if (this.activeTool === "grab") {
+        this.clicked = true; // Set clicked to enable panning
         this.startX = e.clientX;
         this.startY = e.clientY;
         this.clearCanvas();
       }
-      // Block all other actions in read-only mode
+      // Block all other actions in read-only mode or when session expired
       return;
     }
 
@@ -1323,6 +1411,7 @@ export class CanvasEngine {
     } else if (this.activeTool === "eraser") {
       this.eraser(x, y);
     } else if (this.activeTool === "grab") {
+      this.clicked = true; // Set clicked to enable panning
       this.startX = e.clientX;
       this.startY = e.clientY;
     } else if (this.activeTool === "laser") {
@@ -1340,6 +1429,13 @@ export class CanvasEngine {
       this.laserActive = false;
       this.laserPosition = null;
       this.sendLaserOff();
+      this.clearCanvas();
+      return;
+    }
+
+    // Reset clicked state for grab tool (important for read-only mode panning)
+    if (this.activeTool === "grab") {
+      this.clicked = false;
       this.clearCanvas();
       return;
     }
@@ -1518,10 +1614,6 @@ export class CanvasEngine {
             };
           }
           break;
-
-        case "grab":
-          this.startX = e.clientX;
-          this.startY = e.clientY;
       }
 
       if (!shape) {
@@ -1601,6 +1693,49 @@ export class CanvasEngine {
 
   mouseMoveHandler = (e: MouseEvent) => {
     const { x, y } = this.transformPanScale(e.clientX, e.clientY);
+
+    // If read-only mode or session expired, only allow grab tool for panning
+    if (this.isReadOnly || this.isSessionExpired) {
+      if (this.activeTool === "grab" && this.clicked) {
+        const deltaX = e.clientX - this.startX;
+        const deltaY = e.clientY - this.startY;
+        this.panX += deltaX;
+        this.panY += deltaY;
+        this.startX = e.clientX;
+        this.startY = e.clientY;
+        this.clearCanvas();
+        return;
+      }
+      // Allow cursor movement for display purposes
+      if (!this.isStandalone && this.isConnected) {
+        if (this.cursorThrottleTimeout === null) {
+          this.cursorThrottleTimeout = window.setTimeout(() => {
+            const coords = this.transformPanScale(e.clientX, e.clientY);
+
+            const message = {
+              type: WsDataType.CURSOR_MOVE,
+              roomId: this.roomId,
+              userId: this.userId!,
+              userName: this.userName!,
+              connectionId: this.connectionId,
+              message: JSON.stringify({ x: coords.x, y: coords.y }),
+            };
+
+            try {
+              if (this.socket?.readyState === WebSocket.OPEN) {
+                this.socket.send(JSON.stringify(message));
+              }
+            } catch (error) {
+              console.error("Error sending cursor position:", error);
+            }
+
+            this.cursorThrottleTimeout = null;
+          }, 50);
+        }
+        this.clearCanvas();
+      }
+      return;
+    }
 
     if (this.activeTool === "selection") {
       if (this.SelectionController.isDraggingShape()) {
@@ -2673,9 +2808,18 @@ export class CanvasEngine {
   }
 
   destroy() {
+    // Deactivate laser if active
+    if (this.laserActive) {
+      this.laserActive = false;
+      this.laserPosition = null;
+      this.sendLaserOff();
+    }
+    
     this.canvas.removeEventListener("mousedown", this.mouseDownHandler);
     this.canvas.removeEventListener("mousemove", this.mouseMoveHandler);
     this.canvas.removeEventListener("mouseup", this.mouseUpHandler);
+    this.canvas.removeEventListener("mouseleave", this.mouseUpHandler);
+    document.removeEventListener("mouseup", this.mouseUpHandler);
     this.canvas.removeEventListener("wheel", this.mouseWheelHandler);
     this.canvas.removeEventListener("touchstart", this.touchStartHandler);
     this.canvas.removeEventListener("touchmove", this.touchMoveHandler);
@@ -2750,10 +2894,12 @@ export class CanvasEngine {
   }
 
   public updateShapes(shapes: Shape[]): void {
+    let hasNewShapes = false;
     shapes.forEach((shape) => {
       const index = this.existingShapes.findIndex((s) => s.id === shape.id);
       if (index === -1) {
         this.existingShapes.push(shape);
+        hasNewShapes = true;
       } else {
         this.existingShapes[index] = shape;
         const selected = this.SelectionController.getSelectedShape();
@@ -2762,7 +2908,17 @@ export class CanvasEngine {
         }
       }
     });
-    this.clearCanvas();
+    
+    if (hasNewShapes || shapes.length > 0) {
+      console.log("[WS-CLIENT] updateShapes called", {
+        shapesAdded: shapes.length,
+        totalShapes: this.existingShapes.length,
+        isReadOnly: this.isReadOnly,
+        hasNewShapes
+      });
+    }
+    
+    this.clearCanvas(); // Force re-render
   }
 
   public removeShape(id: string): void {

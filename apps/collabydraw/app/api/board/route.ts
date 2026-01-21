@@ -22,9 +22,9 @@ interface SessionInfo {
 /**
  * Validates that a session exists and is confirmed
  * @param sessionId - The session ID to validate
- * @returns Promise<{valid: boolean, isConfirmed: boolean, error?: string}>
+ * @returns Promise<{valid: boolean, isConfirmed: boolean, sessionInfo?: SessionInfo, error?: string}>
  */
-async function validateSession(sessionId: string): Promise<{valid: boolean, isConfirmed: boolean, error?: string}> {
+async function validateSession(sessionId: string): Promise<{valid: boolean, isConfirmed: boolean, sessionInfo?: SessionInfo, error?: string}> {
   try {
     const supabaseUrl = process.env.SUPABASE_FUNCTION_URL || "https://kwyatmfsrfnpnkyfaphv.supabase.co/functions/v1/get-session-info";
     const url = `${supabaseUrl}?id=${encodeURIComponent(sessionId)}`;
@@ -78,7 +78,7 @@ async function validateSession(sessionId: string): Promise<{valid: boolean, isCo
       isConfirmed
     });
 
-    return { valid: true, isConfirmed };
+    return { valid: true, isConfirmed, sessionInfo };
   } catch (error) {
     console.error("[SESSION-VALIDATION] Exception validating session", {
       sessionId,
@@ -206,6 +206,17 @@ export async function GET(request: NextRequest) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     });
+
+    // Store session info in cookie for frontend access
+    if (sessionValidation.sessionInfo) {
+      response.cookies.set("sessionInfo", JSON.stringify(sessionValidation.sessionInfo), {
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        httpOnly: false,
+        path: "/",
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+      });
+    }
 
     console.log("[WS-TOKEN] Token stored in cookie", {
       cookieName: "accessToken",

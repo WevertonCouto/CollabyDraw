@@ -15,7 +15,7 @@ export default function ToolSelector({ selectedTool, onToolSelect, isReadOnly = 
             <header className="Tool_Bar flex items-center gap-1 p-1.5 rounded-lg Island">
                 <div className="flex items-center gap-1 lg:gap-3">
                     {tools.map((tool) => {
-                        // In read-only mode, only allow grab tool, disable all others
+                        // In read-only mode or session expired, only allow grab tool, disable all others
                         const isToolDisabled = isReadOnly && tool.type !== "grab";
                         // If tool is disabled and currently selected, switch to grab
                         const shouldForceGrab = isReadOnly && selectedTool !== "grab" && tool.type === "grab";
@@ -42,7 +42,7 @@ export default function ToolSelector({ selectedTool, onToolSelect, isReadOnly = 
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    {isToolDisabled ? `${tool.label} (Disabled in read-only mode)` : tool.label}
+                                    {isToolDisabled ? `${tool.label} (Disabled - session expired or read-only mode)` : tool.label}
                                 </TooltipContent>
                             </Tooltip>
                         );
