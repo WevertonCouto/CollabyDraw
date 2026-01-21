@@ -1669,26 +1669,38 @@ export class CanvasEngine {
 
     if (e.ctrlKey || e.metaKey) {
       const scaleAmount = -e.deltaY / 200;
-      const newScale = this.scale * (1 + scaleAmount);
+      let newScale = this.scale * (1 + scaleAmount);
+      
+      // Limitar scale entre 0.2 e 5 (mesmos limites do ZoomControl)
+      newScale = Math.max(0.2, Math.min(5, newScale));
+      
+      // Se o scale não mudou (já está no limite), não fazer nada
+      if (Math.abs(newScale - this.scale) < 0.001) {
+        return;
+      }
 
       const mouseX = e.clientX - this.canvas.offsetLeft;
       const mouseY = e.clientY - this.canvas.offsetTop;
 
+      // Evitar divisão por zero
+      if (this.scale <= 0) {
+        this.scale = 1;
+      }
+
       const canvasMouseX = (mouseX - this.panX) / this.scale;
       const canvasMouseY = (mouseY - this.panY) / this.scale;
 
-      this.panX -= canvasMouseX * (newScale - this.scale);
-      this.panY -= canvasMouseY * (newScale - this.scale);
+      const scaleDiff = newScale - this.scale;
+      this.panX -= canvasMouseX * scaleDiff;
+      this.panY -= canvasMouseY * scaleDiff;
 
-      this.scale = newScale;
-
-      this.onScaleChange(this.scale);
+      // Usar setScale para garantir validações consistentes
+      this.setScale(newScale);
     } else {
       this.panX -= e.deltaX;
       this.panY -= e.deltaY;
+      this.clearCanvas();
     }
-
-    this.clearCanvas();
   };
 
   mouseMoveHandler = (e: MouseEvent) => {

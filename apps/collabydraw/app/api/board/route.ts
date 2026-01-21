@@ -93,6 +93,7 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const sessionId = searchParams.get("id");
     const userName = searchParams.get("name");
+    const readOnlyFromQuery = searchParams.get("readOnly") === "true";
 
     // Validate parameters
     const validated = BoardAccessSchema.parse({
@@ -102,7 +103,10 @@ export async function GET(request: NextRequest) {
 
     // Validate session exists and check if confirmed
     const sessionValidation = await validateSession(validated.id);
-    const isReadOnly = !sessionValidation.isConfirmed;
+    
+    // If readOnly=true is in the URL, force read-only mode regardless of session status
+    // Otherwise, use session validation result
+    const isReadOnly = readOnlyFromQuery || !sessionValidation.isConfirmed;
     
     if (!sessionValidation.valid) {
       console.error("[SESSION-VALIDATION] Session validation failed", {
