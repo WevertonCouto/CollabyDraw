@@ -455,7 +455,10 @@ export default function CanvasBoard() {
                 {matches && (
                     <div className="flex items-center gap-4">
                         {sessionInfo && mode === 'room' && (
-                            <SessionTimer sessionInfo={sessionInfo} />
+                            <SessionTimer 
+                                sessionInfo={sessionInfo}
+                                onExpiredChange={setIsSessionExpired}
+                            />
                         )}
                         <CollaborationToolbar participants={participants} />
                     </div>

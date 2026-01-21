@@ -87,7 +87,7 @@ export function SessionTimer({ sessionInfo, onExpiredChange }: SessionTimerProps
     const interval = setInterval(calculateTimeRemaining, 1000);
 
     return () => clearInterval(interval);
-  }, [sessionInfo]);
+  }, [sessionInfo, isExpired, onExpiredChange]);
 
   if (!sessionInfo || !timeRemaining) {
     return null;
