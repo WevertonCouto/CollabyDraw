@@ -1,21 +1,47 @@
+"use client"
+
 import { Minus, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { useRef } from "react";
 
 export default function ZoomControl({
     scale,
     setScale
 }: { scale: number; setScale: React.Dispatch<React.SetStateAction<number>> }) {
+    const throttleTimeoutRef = useRef<number | null>(null);
 
     const zoomIn = () => {
-        setScale((prevScale: number) => Math.min(prevScale * 1.1, 5));
+        if (throttleTimeoutRef.current !== null) return;
+        
+        setScale((prevScale: number) => {
+            const newScale = Math.min(prevScale * 1.1, 5);
+            // Throttle: aguardar 50ms antes de permitir próximo zoom
+            throttleTimeoutRef.current = window.setTimeout(() => {
+                throttleTimeoutRef.current = null;
+            }, 50);
+            return newScale;
+        });
     };
 
     const zoomOut = () => {
-        setScale(prevScale => Math.max(prevScale * 0.9, 0.2));
+        if (throttleTimeoutRef.current !== null) return;
+        
+        setScale(prevScale => {
+            const newScale = Math.max(prevScale * 0.9, 0.2);
+            // Throttle: aguardar 50ms antes de permitir próximo zoom
+            throttleTimeoutRef.current = window.setTimeout(() => {
+                throttleTimeoutRef.current = null;
+            }, 50);
+            return newScale;
+        });
     };
 
     const resetScale = () => {
+        if (throttleTimeoutRef.current !== null) {
+            clearTimeout(throttleTimeoutRef.current);
+            throttleTimeoutRef.current = null;
+        }
         setScale(1);
     };
 

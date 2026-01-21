@@ -191,10 +191,18 @@ export default function CanvasBoard() {
         }));
     }, []);
 
+    // Refs para prevenir ciclos de atualização
+    const isUpdatingScaleFromEngine = useRef(false);
+    const lastScaleRef = useRef<number>(1);
+
     useEffect(() => {
         const { engine, scale } = canvasEngineState;
-        if (engine) {
-            engine.setScale(scale);
+        if (engine && !isUpdatingScaleFromEngine.current) {
+            // Só atualiza o engine se a escala realmente mudou (evita atualizações desnecessárias)
+            if (Math.abs(lastScaleRef.current - scale) > 0.001) {
+                lastScaleRef.current = scale;
+                engine.setScale(scale);
+            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [canvasEngineState.engine, canvasEngineState.scale]);
@@ -344,10 +352,26 @@ export default function CanvasBoard() {
     const handleScaleUpdate = useCallback((newScale: number | ((prev: number) => number)) => {
         setCanvasEngineState(prev => {
             const finalScale = typeof newScale === 'function' ? newScale(prev.scale) : newScale;
+            
+            // Se a escala não mudou significativamente, não atualizar
+            if (Math.abs(finalScale - prev.scale) < 0.001) {
+                return prev;
+            }
 
+            // Atualiza o lastScaleRef para prevenir atualizações desnecessárias no useEffect
+            lastScaleRef.current = finalScale;
+
+            // Marca que estamos atualizando do usuário (não do engine)
+            isUpdatingScaleFromEngine.current = true;
+            
             if (prev.engine) {
                 prev.engine.setScale(finalScale); // 🔥 this handles panX, panY, canvas.clear
             }
+
+            // Reset flag após um pequeno delay
+            setTimeout(() => {
+                isUpdatingScaleFromEngine.current = false;
+            }, 0);
 
             return {
                 ...prev,

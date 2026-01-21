@@ -2847,15 +2847,30 @@ export class CanvasEngine {
   }
 
   setScale(newScale: number) {
+    // Evitar atualizações se a escala não mudou significativamente
+    if (Math.abs(this.scale - newScale) < 0.001) {
+      return;
+    }
+
     const rect = this.canvas.getBoundingClientRect();
     const centerX = rect.width / 2;
     const centerY = rect.height / 2;
 
-    this.panX -= centerX * (newScale - this.scale);
-    this.panY -= centerY * (newScale - this.scale);
+    // Calcular a diferença de escala antes de atualizar
+    const scaleDiff = newScale - this.scale;
 
+    // Atualizar pan para manter o centro visual estável
+    this.panX -= centerX * scaleDiff;
+    this.panY -= centerY * scaleDiff;
+
+    const oldScale = this.scale;
     this.scale = newScale;
-    this.onScaleChange(this.scale);
+
+    // Só notificar mudança se a escala realmente mudou
+    if (Math.abs(oldScale - newScale) > 0.001) {
+      this.onScaleChange(this.scale);
+    }
+    
     this.clearCanvas();
   }
 
