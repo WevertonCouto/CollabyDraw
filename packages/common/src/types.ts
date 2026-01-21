@@ -66,6 +66,9 @@ export enum WsDataType {
   STREAM_SHAPE = "STREAM_SHAPE",
   STREAM_UPDATE = "STREAM_UPDATE",
   CURSOR_MOVE = "CURSOR_MOVE",
+  LASER_MOVE = "LASER_MOVE",
+  LASER_ON = "LASER_ON",
+  LASER_OFF = "LASER_OFF",
 }
 
 export interface WebSocketMessage {

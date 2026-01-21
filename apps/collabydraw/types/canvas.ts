@@ -36,7 +36,8 @@ export type ToolType =
   | "arrow"
   | "free-draw"
   | "eraser"
-  | "text";
+  | "text"
+  | "laser";
 export type Tool = {
   type: ToolType;
   icon: React.ReactNode;

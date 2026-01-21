@@ -66,6 +66,7 @@ export class CanvasEngine {
   private token: string | null;
   private canvasBgColor: string;
   private isStandalone: boolean = false;
+  private isReadOnly: boolean = false;
   private onScaleChangeCallback: (scale: number) => void;
   private onParticipantsUpdate:
     | ((participants: RoomParticipants[]) => void)
@@ -127,6 +128,15 @@ export class CanvasEngine {
    */
   private remoteClickIndicators: Map<string, number> = new Map();
 
+  // Laser pointer state
+  private laserActive: boolean = false;
+  private laserPosition: { x: number; y: number } | null = null;
+  private laserThrottleTimeout: number | null = null;
+  private remoteLaserPointers: Map<
+    string,
+    { x: number; y: number; userId: string; userName: string }
+  > = new Map();
+
   private currentTheme: "light" | "dark" | null = null;
   private onLiveUpdateFromSelection?: (shape: Shape) => void;
 
@@ -145,7 +155,8 @@ export class CanvasEngine {
     onParticipantsUpdate: ((participants: RoomParticipants[]) => void) | null,
     onConnectionChange: ((isConnected: boolean) => void) | null,
     encryptionKey: string | null,
-    appTheme: "light" | "dark" | null
+    appTheme: "light" | "dark" | null,
+    isReadOnly: boolean = false
   ) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -156,6 +167,7 @@ export class CanvasEngine {
     this.userName = userName;
     this.token = token;
     this.isStandalone = isStandalone;
+    this.isReadOnly = isReadOnly;
     this.onScaleChangeCallback = onScaleChangeCallback;
     this.onParticipantsUpdate = onParticipantsUpdate;
     this.onConnectionChange = onConnectionChange;
@@ -304,6 +316,15 @@ export class CanvasEngine {
               });
               keysToRemove.forEach(key => this.remoteCursors.delete(key));
               
+              // Remove laser pointers for the user who left
+              const laserKeysToRemove: string[] = [];
+              this.remoteLaserPointers.forEach((laser, key) => {
+                if (laser.userId === data.userId) {
+                  laserKeysToRemove.push(key);
+                }
+              });
+              laserKeysToRemove.forEach(key => this.remoteLaserPointers.delete(key));
+              
               // Remove click indicators for the user who left
               const clickKeysToRemove: string[] = [];
               this.remoteClickIndicators.forEach((_, key) => {
@@ -327,6 +348,28 @@ export class CanvasEngine {
                 userId: data.userId,
                 userName: data.userName ?? data.userId,
               });
+              this.clearCanvas();
+            }
+            break;
+
+          case WsDataType.LASER_MOVE:
+            if (data.userId !== this.userId && data.message) {
+              const coords = JSON.parse(data.message);
+              const key = `${data.userId}-${data.connectionId}`;
+              this.remoteLaserPointers.set(key, {
+                x: coords.x,
+                y: coords.y,
+                userId: data.userId,
+                userName: data.userName ?? data.userId,
+              });
+              this.clearCanvas();
+            }
+            break;
+
+          case WsDataType.LASER_OFF:
+            if (data.userId !== this.userId) {
+              const key = `${data.userId}-${data.connectionId}`;
+              this.remoteLaserPointers.delete(key);
               this.clearCanvas();
             }
             break;
@@ -517,6 +560,9 @@ export class CanvasEngine {
 
   public async sendMessage(content: string) {
     if (!content?.trim()) return;
+    // Block sending messages in read-only mode
+    if (this.isReadOnly) return;
+    
     const parsed = JSON.parse(content);
 
     if (this.socket?.readyState === WebSocket.OPEN) {
@@ -554,7 +600,7 @@ export class CanvasEngine {
   }
 
   private streamShape(shape: Shape) {
-    if (!this.isConnected || this.isStandalone) return;
+    if (!this.isConnected || this.isStandalone || this.isReadOnly) return;
 
     if (!this.streamingShapeId) {
       this.streamingShapeId = shape.id;
@@ -624,6 +670,50 @@ export class CanvasEngine {
       if (this.socket?.readyState === WebSocket.OPEN) {
         this.socket.send(JSON.stringify(message));
       }
+    }
+  }
+
+  private sendLaserPosition(x: number, y: number) {
+    if (this.isReadOnly || this.isStandalone || !this.isConnected) return;
+
+    if (this.laserThrottleTimeout !== null) {
+      return;
+    }
+
+    this.laserThrottleTimeout = window.setTimeout(() => {
+      const message = {
+        type: WsDataType.LASER_MOVE,
+        roomId: this.roomId!,
+        userId: this.userId!,
+        userName: this.userName!,
+        connectionId: this.connectionId,
+        message: JSON.stringify({ x, y }),
+        timestamp: new Date().toISOString(),
+      };
+
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify(message));
+      }
+
+      this.laserThrottleTimeout = null;
+    }, 50);
+  }
+
+  private sendLaserOff() {
+    if (this.isReadOnly || this.isStandalone || !this.isConnected) return;
+
+    const message = {
+      type: WsDataType.LASER_OFF,
+      roomId: this.roomId!,
+      userId: this.userId!,
+      userName: this.userName!,
+      connectionId: this.connectionId,
+      message: null,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(message));
     }
   }
 
@@ -1098,6 +1188,66 @@ export class CanvasEngine {
       this.ctx.restore();
     });
 
+    // Render local laser pointer
+    if (this.laserActive && this.laserPosition) {
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(this.laserPosition.x, this.laserPosition.y, 8, 0, Math.PI * 2);
+      this.ctx.fillStyle = "#e03131";
+      this.ctx.fill();
+      
+      // Add glow effect
+      this.ctx.shadowBlur = 10;
+      this.ctx.shadowColor = "#e03131";
+      this.ctx.beginPath();
+      this.ctx.arc(this.laserPosition.x, this.laserPosition.y, 8, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      this.ctx.restore();
+    }
+
+    // Render remote laser pointers
+    this.remoteLaserPointers.forEach((laser, userConnKey) => {
+      const { x, y, userId, userName } = laser;
+      
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, 8, 0, Math.PI * 2);
+      this.ctx.fillStyle = "#e03131";
+      this.ctx.fill();
+      
+      // Add glow effect
+      this.ctx.shadowBlur = 10;
+      this.ctx.shadowColor = "#e03131";
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, 8, 0, Math.PI * 2);
+      this.ctx.fill();
+      
+      // Draw user name label above laser pointer
+      const offsetY = y - 15;
+      const paddingX = 5;
+      const paddingY = 3;
+      
+      this.ctx.font = "600 12px sans-serif";
+      const textMetrics = this.ctx.measureText(userName);
+      const textWidth = textMetrics.width;
+      
+      this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      this.ctx.fillRect(
+        x - textWidth / 2 - paddingX,
+        offsetY - 12 - paddingY,
+        textWidth + paddingX * 2,
+        12 + paddingY * 2
+      );
+      
+      this.ctx.fillStyle = COLOR_WHITE;
+      this.ctx.textAlign = "center";
+      this.ctx.textBaseline = "middle";
+      this.ctx.fillText(userName, x, offsetY - 6);
+      
+      this.ctx.restore();
+    });
+
     this.remoteClickIndicators.forEach((timestamp, key) => {
       if (Date.now() - timestamp > 1000) {
         this.remoteClickIndicators.delete(key);
@@ -1107,6 +1257,18 @@ export class CanvasEngine {
 
   mouseDownHandler = (e: MouseEvent) => {
     const { x, y } = this.transformPanScale(e.clientX, e.clientY);
+    
+    // If read-only mode, only allow grab tool for panning
+    if (this.isReadOnly) {
+      if (this.activeTool === "grab") {
+        this.startX = e.clientX;
+        this.startY = e.clientY;
+        this.clearCanvas();
+      }
+      // Block all other actions in read-only mode
+      return;
+    }
+
     if (this.activeTool === "selection") {
       const selectedShape = this.SelectionController.getSelectedShape();
       if (selectedShape) {
@@ -1163,11 +1325,25 @@ export class CanvasEngine {
     } else if (this.activeTool === "grab") {
       this.startX = e.clientX;
       this.startY = e.clientY;
+    } else if (this.activeTool === "laser") {
+      this.laserActive = true;
+      this.laserPosition = { x, y };
+      this.sendLaserPosition(x, y);
+      this.clearCanvas();
+      return;
     }
     this.clearCanvas();
   };
 
   mouseUpHandler = (e: MouseEvent) => {
+    if (this.activeTool === "laser") {
+      this.laserActive = false;
+      this.laserPosition = null;
+      this.sendLaserOff();
+      this.clearCanvas();
+      return;
+    }
+
     if (
       this.activeTool !== "free-draw" &&
       this.activeTool !== "eraser" &&
@@ -1462,6 +1638,14 @@ export class CanvasEngine {
           this.cursorThrottleTimeout = null;
         }, 50);
       }
+    }
+
+    // Handle laser pointer movement
+    if (this.laserActive && this.activeTool === "laser") {
+      this.laserPosition = { x, y };
+      this.sendLaserPosition(x, y);
+      this.clearCanvas();
+      return;
     }
 
     if (this.clicked) {

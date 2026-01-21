@@ -408,6 +408,9 @@ wss.on("connection", function connection(ws, req) {
           }
         }
 
+        case WsDataType.LASER_MOVE:
+        case WsDataType.LASER_ON:
+        case WsDataType.LASER_OFF:
         case WsDataType.CURSOR_MOVE:
           if (
             parsedData.roomId &&

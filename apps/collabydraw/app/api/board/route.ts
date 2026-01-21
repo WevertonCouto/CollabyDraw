@@ -10,6 +10,84 @@ const BoardAccessSchema = z.object({
   name: z.string().min(1, "User name is required").max(100),
 });
 
+// Session info type from Supabase function
+interface SessionInfo {
+  id: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+}
+
+/**
+ * Validates that a session exists and is confirmed
+ * @param sessionId - The session ID to validate
+ * @returns Promise<{valid: boolean, isConfirmed: boolean, error?: string}>
+ */
+async function validateSession(sessionId: string): Promise<{valid: boolean, isConfirmed: boolean, error?: string}> {
+  try {
+    const supabaseUrl = process.env.SUPABASE_FUNCTION_URL || "https://kwyatmfsrfnpnkyfaphv.supabase.co/functions/v1/get-session-info";
+    const url = `${supabaseUrl}?id=${encodeURIComponent(sessionId)}`;
+    
+    console.log("[SESSION-VALIDATION] Validating session", {
+      sessionId,
+      url
+    });
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log("[SESSION-VALIDATION] Session not found", { sessionId });
+        return { valid: false, isConfirmed: false, error: "Session not found" };
+      }
+      
+      console.error("[SESSION-VALIDATION] Error fetching session", {
+        sessionId,
+        status: response.status,
+        statusText: response.statusText
+      });
+      return { valid: false, isConfirmed: false, error: "Failed to validate session" };
+    }
+
+    const sessionInfo: SessionInfo = await response.json();
+    
+    console.log("[SESSION-VALIDATION] Session info received", {
+      sessionId,
+      status: sessionInfo.status,
+      hasId: !!sessionInfo.id
+    });
+
+    // Validate that session exists
+    if (!sessionInfo.id) {
+      console.log("[SESSION-VALIDATION] Invalid session data - no ID", { sessionInfo });
+      return { valid: false, isConfirmed: false, error: "Invalid session data" };
+    }
+
+    // Check if status is confirmed
+    const isConfirmed = sessionInfo.status === "confirmed";
+    
+    console.log("[SESSION-VALIDATION] Session validation result", {
+      sessionId,
+      status: sessionInfo.status,
+      isConfirmed
+    });
+
+    return { valid: true, isConfirmed };
+  } catch (error) {
+    console.error("[SESSION-VALIDATION] Exception validating session", {
+      sessionId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    return { valid: false, isConfirmed: false, error: "Failed to validate session" };
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -21,6 +99,21 @@ export async function GET(request: NextRequest) {
       id: sessionId || undefined,
       name: userName || undefined,
     });
+
+    // Validate session exists and check if confirmed
+    const sessionValidation = await validateSession(validated.id);
+    const isReadOnly = !sessionValidation.isConfirmed;
+    
+    if (!sessionValidation.valid) {
+      console.error("[SESSION-VALIDATION] Session validation failed", {
+        sessionId: validated.id,
+        error: sessionValidation.error
+      });
+      return NextResponse.json(
+        { error: sessionValidation.error || "Session validation failed" },
+        { status: 403 }
+      );
+    }
 
     // Get or create room with session ID
     const roomResult = await getOrCreateRoomBySessionId(validated.id);
@@ -93,13 +186,22 @@ export async function GET(request: NextRequest) {
     // Build redirect URL with room hash and name query param
     // Query params come before the hash in URLs
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL || request.nextUrl.origin).replace(/\/$/, '');
-    const redirectUrl = `${baseUrl}/?name=${encodeURIComponent(validated.name)}#room=${validated.id},${encryptionKey}`;
+    const redirectUrl = `${baseUrl}/?name=${encodeURIComponent(validated.name)}${isReadOnly ? '&readOnly=true' : ''}#room=${validated.id},${encryptionKey}`;
 
     // Store token in cookie (non-httpOnly so it can be read on client for WebSocket)
     const response = NextResponse.redirect(redirectUrl);
     response.cookies.set("accessToken", token, {
       maxAge: 60 * 60 * 24 * 7, // 7 days
       httpOnly: false, // Must be false to read on client for WebSocket
+      path: "/",
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    });
+
+    // Store read-only status in cookie
+    response.cookies.set("isReadOnly", isReadOnly.toString(), {
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      httpOnly: false,
       path: "/",
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
@@ -113,7 +215,8 @@ export async function GET(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       redirectUrl: redirectUrl,
       sessionId: validated.id,
-      userName: validated.name
+      userName: validated.name,
+      isReadOnly: isReadOnly
     });
 
     return response;

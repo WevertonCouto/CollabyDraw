@@ -31,6 +31,7 @@ export default function CanvasBoard() {
     const [participants, setParticipants] = useState<RoomParticipants[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [isCanvasReady, setIsCanvasReady] = useState(false);
+    const [isReadOnly, setIsReadOnly] = useState(false);
     const initializedWithMode = useRef<Mode | null>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const currentHashRef = useRef<string>('');
@@ -93,6 +94,12 @@ export default function CanvasBoard() {
             const currentRoomParams = getRoomParamsFromHash(hash);
             const userNameFromQuery = searchParams.get('name');
 
+            // Check for read-only flag from URL query param or cookie
+            const readOnlyFromQuery = searchParams.get('readOnly') === 'true';
+            const readOnlyFromCookie = getCookie('isReadOnly') === 'true';
+            const shouldBeReadOnly = readOnlyFromQuery || readOnlyFromCookie;
+            setIsReadOnly(shouldBeReadOnly);
+
             if (currentRoomParams) {
                 // Always enter room mode when room params are present (no auth required)
                 setMode("room");
@@ -130,6 +137,13 @@ export default function CanvasBoard() {
             }
         };
     }, [pathname, searchParams, session]);
+
+    // Switch to grab tool when entering read-only mode
+    useEffect(() => {
+        if (isReadOnly && canvasEngineState.activeTool !== "grab") {
+            setCanvasEngineState(prev => ({ ...prev, activeTool: "grab" }));
+        }
+    }, [isReadOnly, canvasEngineState.activeTool]);
 
     useEffect(() => {
         setCanvasEngineState(prev => ({ ...prev, canvasColor: canvasBgLight[0] }));
@@ -227,7 +241,8 @@ export default function CanvasBoard() {
             } : null,
             mode === 'room' ? (connectionStatus) => setIsConnected(connectionStatus) : null,
             userRef.current.encryptionKey,
-            theme === 'light' ? "light" : "dark"
+            theme === 'light' ? "light" : "dark",
+            isReadOnly
         );
         engine.setOnShapeCountChange((count: number) => {
             setCanvasEngineState(prev => ({
@@ -236,7 +251,7 @@ export default function CanvasBoard() {
             }));
         });
         return engine;
-    }, [canvasEngineState.canvasColor, mode, theme]);
+    }, [canvasEngineState.canvasColor, mode, theme, isReadOnly]);
 
     useEffect(() => {
         if (!isCanvasReady) return;
@@ -305,12 +320,14 @@ export default function CanvasBoard() {
     }
 
     return (
-        <div className={cn("collabydraw h-screen overflow-hidden",
+        <div             className={cn("collabydraw h-screen overflow-hidden",
             canvasEngineState.activeTool === "eraser"
                 ? "cursor-[url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABQAAAAUCAYAAACNiR0NAAAAAXNSR0IArs4c6QAAAOBJREFUOE9jZKAyYKSyeQzDwMD////7MDAw6EGD5hIjI+MWfMGE08sggz5+/Dj71q1bHPv27eMFGeLk5PRZTU3tBz8/fyoug7EaCDLs58+fa0NDQ9k2b96M4iBfX1+G1atX/2JnZw/GZihWAz98+PA8NjZWAt0wmMkgQxcvXvxCQEBAEt37GAaCXHf69OnFZmZmAvjC6tSpUx9MTU1j0V2JzcCqzs7OpoqKCmZ8BnZ0dPwtLy+vY2RkbENWRxcDqetlkPOpGikgA6mebGCGUi1hI8ca1bIeucXaMCi+SPU6AHRTjhWg+vuGAAAAAElFTkSuQmCC')_10_10,auto]"
                 : canvasEngineState.activeTool === "grab" && !canvasEngineState.sidebarOpen
                     ? canvasEngineState.grabbing ? "cursor-grabbing" : "cursor-grab"
-                    : "cursor-crosshair")}>
+                    : canvasEngineState.activeTool === "laser"
+                        ? "cursor-crosshair"
+                        : "cursor-crosshair")}>
             <div className="App_Menu App_Menu_Top fixed z-[4] top-4 right-4 left-4 flex justify-center items-center xs670:grid xs670:grid-cols-[1fr_auto_1fr] xs670:gap-4 md:gap-8 xs670:items-start">
                 {matches && (
                     <div className="Main_Menu_Stack Sidebar_Trigger_Button xs670:grid xs670:gap-[calc(.25rem*6)] grid-cols-[auto] grid-flow-row grid-rows auto-rows-min justify-self-start">
@@ -391,6 +408,7 @@ export default function CanvasBoard() {
                     onToolSelect={(newTool: SetStateAction<ToolType>) =>
                         setCanvasEngineState(prev => ({ ...prev, activeTool: typeof newTool === 'function' ? newTool(prev.activeTool) : newTool }))
                     }
+                    isReadOnly={isReadOnly}
                 />
 
                 {matches && (
@@ -413,6 +431,12 @@ export default function CanvasBoard() {
 
             {!isLoading && matches && (
                 <EncryptedWidget />
+            )}
+
+            {isReadOnly && mode === 'room' && (
+                <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-yellow-500/90 dark:bg-yellow-600/90 text-black dark:text-white px-4 py-2 rounded-md shadow-lg backdrop-blur-sm">
+                    <span className="text-sm font-medium">Read-Only Mode: You can view but not edit</span>
+                </div>
             )}
 
             <div className="collabydraw-textEditorContainer"></div>
